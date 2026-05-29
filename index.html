@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>삼천리모터스 일일업무보고 대시보드</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Malgun Gothic','Apple SD Gothic Neo',sans-serif;background:#F0F2F5;color:#1A202C;min-height:100vh}
+
+/* ── Header ── */
+.hdr{background:linear-gradient(135deg,#1B3A5C 0%,#2D6098 100%);color:#fff;padding:14px 24px;display:flex;align-items:center;justify-content:space-between;box-shadow:0 2px 8px rgba(0,0,0,.18)}
+.hdr-left{display:flex;align-items:center;gap:12px}
+.hdr-logo{font-size:22px;font-weight:800;letter-spacing:-.5px}
+.hdr-sub{font-size:11px;opacity:.75;margin-top:2px}
+.hdr-badge{background:rgba(255,255,255,.15);border-radius:6px;padding:4px 10px;font-size:12px}
+.hdr-updated{font-size:11px;opacity:.65;text-align:right;line-height:1.7}
+
+/* ── Month Nav ── */
+.mnav{background:#fff;border-bottom:1px solid #E2E8F0;padding:10px 24px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;position:sticky;top:0;z-index:100;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+.mnav-arrow{width:28px;height:28px;border-radius:50%;border:1px solid #CBD5E0;background:#fff;cursor:pointer;font-size:13px;display:flex;align-items:center;justify-content:center;transition:all .15s}
+.mnav-arrow:hover{background:#1B3A5C;color:#fff;border-color:#1B3A5C}
+.mnav-label{font-weight:700;font-size:14px;min-width:80px;text-align:center;color:#2D3748}
+.mbtn{padding:5px 14px;border-radius:20px;border:1px solid #CBD5E0;background:#fff;cursor:pointer;font-size:12px;color:#4A5568;transition:all .15s}
+.mbtn:hover{border-color:#1B3A5C;color:#1B3A5C}
+.mbtn.on{background:#1B3A5C;color:#fff;border-color:#1B3A5C}
+
+/* ── Main ── */
+.main{padding:20px 24px;max-width:1440px;margin:0 auto}
+
+/* ── KPI Cards ── */
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px;margin-bottom:20px}
+.kpi{background:#fff;border-radius:12px;padding:18px 20px;box-shadow:0 1px 4px rgba(0,0,0,.07);border-top:3px solid #1B3A5C;transition:transform .15s}
+.kpi:hover{transform:translateY(-2px)}
+.kpi.org{border-top-color:#E8A838}
+.kpi.grn{border-top-color:#27AE60}
+.kpi.pur{border-top-color:#6B4FA8}
+.kpi-lbl{font-size:11px;color:#718096;font-weight:600;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px}
+.kpi-val{font-size:30px;font-weight:800;color:#1A202C;line-height:1}
+.kpi-unit{font-size:14px;font-weight:400;color:#718096;margin-left:2px}
+.kpi-sub{font-size:11px;color:#718096;margin-top:6px}
+.prog-bar{height:5px;background:#E2E8F0;border-radius:3px;margin-top:8px;overflow:hidden}
+.prog-fill{height:100%;border-radius:3px;background:#27AE60;transition:width .6s ease}
+
+/* ── Section Header ── */
+.sec-hdr{display:flex;align-items:center;gap:8px;margin:20px 0 12px}
+.sec-title{font-size:15px;font-weight:700;color:#2D3748}
+.sec-badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;background:#EBF4FF;color:#1B3A5C;letter-spacing:.3px}
+.sec-badge.bps{background:#FEF3C7;color:#92400E}
+
+/* ── Chart Grid ── */
+.cg2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
+@media(max-width:860px){.cg2{grid-template-columns:1fr}}
+.cc{background:#fff;border-radius:12px;padding:18px 20px;box-shadow:0 1px 4px rgba(0,0,0,.07)}
+.cc-title{font-size:13px;font-weight:700;color:#2D3748;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between}
+.cw{position:relative;height:250px}
+.cw-tall{position:relative;height:290px}
+
+/* ── Tab buttons ── */
+.tab-row{display:flex;gap:4px;margin-bottom:8px}
+.tbtn{padding:4px 12px;border-radius:5px;border:1px solid #CBD5E0;background:#fff;cursor:pointer;font-size:11px;color:#4A5568;transition:all .15s}
+.tbtn.on{background:#1B3A5C;color:#fff;border-color:#1B3A5C}
+
+/* ── Table ── */
+.tcard{background:#fff;border-radius:12px;padding:18px 20px;box-shadow:0 1px 4px rgba(0,0,0,.07);overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:12px;white-space:nowrap}
+th{background:#F7FAFC;color:#4A5568;font-weight:700;padding:9px 10px;text-align:center;border-bottom:2px solid #E2E8F0;position:sticky;top:0}
+td{padding:7px 10px;text-align:right;border-bottom:1px solid #F0F2F5}
+td.l{text-align:left}
+td.c{text-align:center}
+tr:hover td{background:#F7FAFC}
+tr.ttl td{font-weight:700;background:#EBF4FF!important;color:#1B3A5C}
+.tag-bps{font-size:10px;background:#FEF3C7;color:#92400E;padding:1px 5px;border-radius:4px;margin-left:4px}
+.tag-sal{font-size:10px;background:#EBF4FF;color:#1B3A5C;padding:1px 5px;border-radius:4px;margin-left:4px}
+
+/* ── Loading / Empty ── */
+.loading{text-align:center;padding:80px 0;color:#718096;font-size:15px}
+.empty{text-align:center;padding:60px;color:#A0AEC0;font-size:14px}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:#F0F2F5}
+::-webkit-scrollbar-thumb{background:#CBD5E0;border-radius:3px}
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <div class="hdr-left">
+    <div>
+      <div class="hdr-logo">삼천리모터스</div>
+      <div class="hdr-sub">일일업무보고 대시보드 · 자동화 시스템</div>
+    </div>
+    <div class="hdr-badge">SALES &amp; BPS</div>
+  </div>
+  <div class="hdr-updated" id="hdrUpdated">로딩 중...</div>
+</div>
+
+<div class="mnav">
+  <button class="mnav-arrow" id="btnPrev">◀</button>
+  <span class="mnav-label" id="mnavLabel">-</span>
+  <button class="mnav-arrow" id="btnNext">▶</button>
+  <div style="width:1px;height:20px;background:#E2E8F0;margin:0 4px"></div>
+  <div id="mnavBtns" style="display:flex;gap:4px;flex-wrap:wrap"></div>
+</div>
+
+<div class="main" id="main"><div class="loading">⏳ 데이터 불러오는 중...</div></div>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+// 상수
+// ═══════════════════════════════════════════════════════════
+const BRANCHES = ['청주','천안','동탄','안양','안산','세종'];
+const BC = {청주:'#4472C4',천안:'#ED7D31',동탄:'#5BA85B',안양:'#9B59B6',안산:'#E74C3C',세종:'#16A085',합계:'#2D3748'};
+const BPSC = {천안:'#E8A838',안양:'#4A90D9'};
+const MONTH_NAMES = ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
+
+// ═══════════════════════════════════════════════════════════
+// 상태
+// ═══════════════════════════════════════════════════════════
+let allDates = [];
+let allData  = {};   // date → record
+let availMonths = [];
+let curYM = '';
+let charts = {};
+let salesMode = 'total';   // 'total' | 'branch'
+let salesMetric = 'contract'; // 'contract' | 'delivery'
+let curRecords = [];
+
+// ═══════════════════════════════════════════════════════════
+// 데이터 로딩
+// ═══════════════════════════════════════════════════════════
+async function fetchJSON(url) {
+  const r = await fetch(url + '?_=' + Date.now());
+  if (!r.ok) throw new Error(r.status);
+  return r.json();
+}
+
+async function loadIndex() {
+  try { return await fetchJSON('data/index.json'); }
+  catch { return []; }
+}
+
+async function loadRecord(date) {
+  if (allData[date]) return allData[date];
+  try {
+    allData[date] = await fetchJSON(`data/${date}.json`);
+    return allData[date];
+  } catch { return null; }
+}
+
+async function loadMonth(ym) {
+  const dates = allDates.filter(d => d.startsWith(ym));
+  const recs = await Promise.all(dates.map(d => loadRecord(d)));
+  return recs.filter(Boolean);
+}
+
+// ═══════════════════════════════════════════════════════════
+// 월 내비게이션
+// ═══════════════════════════════════════════════════════════
+function buildMonthNav() {
+  const el = document.getElementById('mnavBtns');
+  el.innerHTML = '';
+  availMonths.forEach(ym => {
+    const y = ym.slice(0,4), m = parseInt(ym.slice(4));
+    const b = document.createElement('button');
+    b.className = 'mbtn' + (ym === curYM ? ' on' : '');
+    b.dataset.ym = ym;
+    b.textContent = `${y}.${String(m).padStart(2,'0')}`;
+    b.onclick = () => switchMonth(ym);
+    el.appendChild(b);
+  });
+  const lbl = document.getElementById('mnavLabel');
+  const y = curYM.slice(0,4), m = parseInt(curYM.slice(4));
+  lbl.textContent = `${y}년 ${m}월`;
+  document.querySelectorAll('.mbtn').forEach(b => b.classList.toggle('on', b.dataset.ym === curYM));
+}
+
+async function switchMonth(ym) {
+  curYM = ym;
+  buildMonthNav();
+  document.getElementById('main').innerHTML = '<div class="loading">⏳ 불러오는 중...</div>';
+  curRecords = await loadMonth(ym);
+  render(curRecords);
+}
+
+document.getElementById('btnPrev').onclick = () => {
+  const i = availMonths.indexOf(curYM);
+  if (i > 0) switchMonth(availMonths[i-1]);
+};
+document.getElementById('btnNext').onclick = () => {
+  const i = availMonths.indexOf(curYM);
+  if (i < availMonths.length-1) switchMonth(availMonths[i+1]);
+};
+
+// ═══════════════════════════════════════════════════════════
+// Chart.js 헬퍼
+// ═══════════════════════════════════════════════════════════
+function destroyCharts() {
+  Object.values(charts).forEach(c => { try{c.destroy()}catch{} });
+  charts = {};
+}
+
+function mkChart(id, cfg) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  if (charts[id]) charts[id].destroy();
+  charts[id] = new Chart(el, cfg);
+}
+
+const BASE_OPT = {
+  responsive:true, maintainAspectRatio:false,
+  animation:{duration:400},
+  plugins:{legend:{position:'bottom',labels:{boxWidth:10,padding:8,font:{size:11}}}},
+  scales:{
+    x:{grid:{display:false},ticks:{font:{size:11},maxTicksLimit:12}},
+    y:{grid:{color:'#F0F2F5'},ticks:{font:{size:11}}},
+  },
+};
+
+// ═══════════════════════════════════════════════════════════
+// 메인 렌더
+// ═══════════════════════════════════════════════════════════
+function render(recs) {
+  if (!recs.length) {
+    const y = curYM.slice(0,4), m = parseInt(curYM.slice(4));
+    document.getElementById('main').innerHTML =
+      `<div class="empty">📭 ${y}년 ${m}월 데이터가 없습니다.</div>`;
+    return;
+  }
+  destroyCharts();
+  const latest = recs[recs.length-1];
+
+  document.getElementById('main').innerHTML = buildLayout();
+  document.getElementById('hdrUpdated').innerHTML =
+    `최근 보고일: <b>${latest.report_date}</b><br>기간: ${latest.period_start}~${latest.period_end}`;
+
+  renderKPI(recs, latest);
+  renderSalesChart(recs);
+  renderDeliveryProgress(latest);
+  renderBpsBalance(recs);
+  renderBpsBar(recs);
+  renderCumLine(recs);
+  renderTable(recs);
+}
+
+function buildLayout() {
+  return `
+  <div class="kpi-grid" id="kpiGrid"></div>
+
+  <div class="sec-hdr">
+    <span class="sec-title">📊 SALES 신차</span>
+    <span class="sec-badge">월 실적</span>
+  </div>
+  <div class="cg2">
+    <div class="cc">
+      <div class="cc-title">
+        <span>당일 실적 추이</span>
+        <div style="display:flex;gap:4px">
+          <button class="tbtn on" id="tSalesCon" onclick="setSalesTab('contract',this)">순계약</button>
+          <button class="tbtn"    id="tSalesDel" onclick="setSalesTab('delivery',this)">출고</button>
+          <button class="tbtn on" id="tSalesTot" onclick="setSalesBranch('total',this)" style="margin-left:6px">합계</button>
+          <button class="tbtn"    id="tSalesBrn" onclick="setSalesBranch('branch',this)">지점별</button>
+        </div>
+      </div>
+      <div class="cw"><canvas id="salesLine"></canvas></div>
+    </div>
+    <div class="cc">
+      <div class="cc-title">월 누계 출고 달성률</div>
+      <div class="cw"><canvas id="salesProgress"></canvas></div>
+    </div>
+  </div>
+
+  <div class="sec-hdr">
+    <span class="sec-title">🔧 BPS 인증중고차</span>
+    <span class="sec-badge bps">천안 · 안양</span>
+  </div>
+  <div class="cg2">
+    <div class="cc">
+      <div class="cc-title">배정잔액 추이</div>
+      <div class="cw"><canvas id="bpsBalance"></canvas></div>
+    </div>
+    <div class="cc">
+      <div class="cc-title">월 누계 순계약 · 출고</div>
+      <div class="cw"><canvas id="bpsCum"></canvas></div>
+    </div>
+  </div>
+
+  <div class="sec-hdr">
+    <span class="sec-title">📈 SALES 월 누계 추이</span>
+    <span class="sec-badge">계약 · 출고 누적</span>
+  </div>
+  <div class="cc" style="margin-bottom:14px">
+    <div class="cw-tall"><canvas id="cumLine"></canvas></div>
+  </div>
+
+  <div class="sec-hdr">
+    <span class="sec-title">📋 일자별 상세</span>
+  </div>
+  <div class="tcard" id="tableWrap"></div>
+  `;
+}
+
+// ═══════════════════════════════════════════════════════════
+// KPI 카드
+// ═══════════════════════════════════════════════════════════
+function renderKPI(recs, latest) {
+  const g = (obj,...keys) => { let v=obj; for(const k of keys){if(v==null)return 0;v=v[k];} return typeof v==='number'?v:0; };
+  const 영업 = latest.영업일수||0, 전체 = latest.전체영업일||1;
+  const 진척 = Math.round(영업/전체*100);
+  const 순 = g(latest,'sales','합계','순계약');
+  const 출 = g(latest,'sales','합계','출고');
+  const 계누 = g(latest,'sales','합계','계약누계');
+  const 출누 = g(latest,'sales','합계','출고누계');
+  const 계획계 = g(latest,'plans','계약계획_합계');
+  const 계획출 = g(latest,'plans','출고계획_합계');
+  const 계달 = 계획계 ? Math.round(계누/계획계*100) : 0;
+  const 출달 = 계획출 ? Math.round(출누/계획출*100) : 0;
+  const 재고 = g(latest,'bps','재고합계');
+  const 천재 = g(latest,'bps','천안','재고');
+  const 양재 = g(latest,'bps','안양','재고');
+  const 장기 = g(latest,'bps','장기재고');
+
+  document.getElementById('kpiGrid').innerHTML = `
+    <div class="kpi">
+      <div class="kpi-lbl">당일 순계약 (SALES)</div>
+      <div class="kpi-val">${순}<span class="kpi-unit">대</span></div>
+      <div class="kpi-sub">월 누계 ${계누}대${계달?` · 계획대비 ${계달}%`:''}</div>
+    </div>
+    <div class="kpi org">
+      <div class="kpi-lbl">당일 출고 (SALES)</div>
+      <div class="kpi-val">${출}<span class="kpi-unit">대</span></div>
+      <div class="kpi-sub">월 누계 ${출누}대${출달?` · 계획대비 ${출달}%`:''}</div>
+    </div>
+    <div class="kpi grn">
+      <div class="kpi-lbl">영업일 진척률</div>
+      <div class="kpi-val">${영업}<span class="kpi-unit">/${전체}일</span></div>
+      <div class="prog-bar"><div class="prog-fill" style="width:${진척}%"></div></div>
+      <div class="kpi-sub">${진척}% 진행</div>
+    </div>
+    <div class="kpi pur">
+      <div class="kpi-lbl">BPS 재고 합계</div>
+      <div class="kpi-val">${재고}<span class="kpi-unit">대</span></div>
+      <div class="kpi-sub">천안 ${천재} · 안양 ${양재} · 장기 ${장기}</div>
+    </div>
+  `;
+}
+
+// ═══════════════════════════════════════════════════════════
+// SALES 추이 라인 차트
+// ═══════════════════════════════════════════════════════════
+function setSalesTab(metric, btn) {
+  salesMetric = metric;
+  document.getElementById('tSalesCon').classList.toggle('on', metric==='contract');
+  document.getElementById('tSalesDel').classList.toggle('on', metric==='delivery');
+  renderSalesChart(curRecords);
+}
+function setSalesBranch(mode, btn) {
+  salesMode = mode;
+  document.getElementById('tSalesTot').classList.toggle('on', mode==='total');
+  document.getElementById('tSalesBrn').classList.toggle('on', mode==='branch');
+  renderSalesChart(curRecords);
+}
+
+function renderSalesChart(recs) {
+  const labels = recs.map(r => r.report_date.slice(5));
+  const key = salesMetric === 'contract' ? '순계약' : '출고';
+  let datasets = [];
+
+  if (salesMode === 'total') {
+    datasets = [{
+      label: `합계 ${key}`,
+      data: recs.map(r => r.sales?.합계?.[key] ?? 0),
+      borderColor:'#1B3A5C', backgroundColor:'rgba(27,58,92,0.08)',
+      fill:true, tension:0.35, pointRadius:4, borderWidth:2.5,
+    }];
+  } else {
+    datasets = BRANCHES.map(b => ({
+      label: b,
+      data: recs.map(r => r.sales?.[b]?.[key] ?? 0),
+      borderColor: BC[b], backgroundColor: BC[b]+'18',
+      fill:false, tension:0.35, pointRadius:3, borderWidth:2,
+    }));
+  }
+
+  mkChart('salesLine', {
+    type:'line', data:{labels, datasets},
+    options:{...BASE_OPT, spanGaps:true,
+      plugins:{...BASE_OPT.plugins,
+        title:{display:false},
+        tooltip:{callbacks:{title:i=>`${i[0].label} (${recs[i[0].dataIndex]?.period_start?.slice(5)||''}~${recs[i[0].dataIndex]?.period_end?.slice(5)||''})`}},
+      }},
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
+// 출고 달성률 수평 바
+// ═══════════════════════════════════════════════════════════
+function renderDeliveryProgress(latest) {
+  const g = (k) => latest.sales?.[k]?.출고누계 ?? 0;
+  const p = (k) => latest.plans?.[`출고계획_${k}`] ?? 0;
+  const labels = BRANCHES;
+  const 누계 = labels.map(g);
+  const 계획 = labels.map(p);
+  const colors = labels.map(b => BC[b]);
+
+  mkChart('salesProgress', {
+    type:'bar',
+    data:{
+      labels,
+      datasets:[
+        { label:'출고 누계', data:누계, backgroundColor:colors.map(c=>c+'CC'), borderWidth:0, borderRadius:5 },
+        { label:'월 계획', data:계획, backgroundColor:colors.map(c=>c+'28'), borderColor:colors, borderWidth:1.5, borderRadius:5 },
+      ],
+    },
+    options:{...BASE_OPT,
+      indexAxis:'y',
+      scales:{
+        x:{...BASE_OPT.scales.x, grid:{display:true,color:'#F0F2F5'}},
+        y:{grid:{display:false}, ticks:{font:{size:12},fontWeight:'bold'}},
+      },
+      plugins:{...BASE_OPT.plugins,
+        tooltip:{callbacks:{
+          afterBody: items => {
+            const i = items[0].dataIndex;
+            const n = 누계[i], c = 계획[i];
+            return c ? [`달성률: ${Math.round(n/c*100)}%`] : [];
+          }
+        }}
+      }
+    },
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
+// BPS 배정잔액 추이
+// ═══════════════════════════════════════════════════════════
+function renderBpsBalance(recs) {
+  const labels = recs.map(r => r.report_date.slice(5));
+  const 천안 = recs.map(r => r.bps?.천안?.배정 ?? null);
+  const 안양 = recs.map(r => r.bps?.안양?.배정 ?? null);
+  const 합계 = recs.map((_, i) =>
+    (천안[i] != null && 안양[i] != null) ? 천안[i]+안양[i] : null);
+
+  mkChart('bpsBalance', {
+    type:'line',
+    data:{labels, datasets:[
+      { label:'합계', data:합계, borderColor:'#2D3748', backgroundColor:'transparent',
+        tension:0.3, pointRadius:3, borderWidth:2, borderDash:[5,3], spanGaps:true },
+      { label:'천안', data:천안, borderColor:BPSC.천안, backgroundColor:BPSC.천안+'18',
+        fill:true, tension:0.3, pointRadius:3, borderWidth:2, spanGaps:true },
+      { label:'안양', data:안양, borderColor:BPSC.안양, backgroundColor:BPSC.안양+'18',
+        fill:true, tension:0.3, pointRadius:3, borderWidth:2, spanGaps:true },
+    ]},
+    options:{...BASE_OPT, spanGaps:true,
+      plugins:{...BASE_OPT.plugins,
+        tooltip:{callbacks:{title:i=>`${i[0].label}일`}},
+      }
+    },
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
+// BPS 누계 순계약 vs 출고 (최신 데이터 기준 bar)
+// ═══════════════════════════════════════════════════════════
+function renderBpsBar(recs) {
+  const labels = recs.map(r => r.report_date.slice(5));
+  const 천안계 = recs.map(r => r.bps?.천안?.월누계계약 ?? 0);
+  const 천안출 = recs.map(r => r.bps?.천안?.월누계출고 ?? 0);
+  const 안양계 = recs.map(r => r.bps?.안양?.월누계계약 ?? 0);
+  const 안양출 = recs.map(r => r.bps?.안양?.월누계출고 ?? 0);
+
+  mkChart('bpsCum', {
+    type:'line',
+    data:{labels, datasets:[
+      { label:'천안 누계계약', data:천안계, borderColor:BPSC.천안, backgroundColor:'transparent',
+        tension:0.3, pointRadius:3, borderWidth:2, spanGaps:true },
+      { label:'천안 누계출고', data:천안출, borderColor:BPSC.천안+'88', backgroundColor:'transparent',
+        tension:0.3, pointRadius:3, borderWidth:2, borderDash:[4,2], spanGaps:true },
+      { label:'안양 누계계약', data:안양계, borderColor:BPSC.안양, backgroundColor:'transparent',
+        tension:0.3, pointRadius:3, borderWidth:2, spanGaps:true },
+      { label:'안양 누계출고', data:안양출, borderColor:BPSC.안양+'88', backgroundColor:'transparent',
+        tension:0.3, pointRadius:3, borderWidth:2, borderDash:[4,2], spanGaps:true },
+    ]},
+    options:{...BASE_OPT, spanGaps:true},
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
+// SALES 월 누계 추이 (전 지점)
+// ═══════════════════════════════════════════════════════════
+function renderCumLine(recs) {
+  const labels = recs.map(r => r.report_date.slice(5));
+  const datasets = BRANCHES.map(b => ({
+    label: b,
+    data: recs.map(r => r.sales?.[b]?.계약누계 ?? null),
+    borderColor: BC[b], backgroundColor:'transparent',
+    tension:0.3, pointRadius:3, borderWidth:2, spanGaps:true,
+  }));
+  datasets.push({
+    label:'합계',
+    data: recs.map(r => r.sales?.합계?.계약누계 ?? null),
+    borderColor: BC['합계'], backgroundColor:'transparent',
+    tension:0.3, pointRadius:4, borderWidth:3, borderDash:[5,2], spanGaps:true,
+  });
+
+  mkChart('cumLine', {
+    type:'line', data:{labels, datasets},
+    options:{...BASE_OPT, spanGaps:true,
+      scales:{
+        ...BASE_OPT.scales,
+        y:{...BASE_OPT.scales.y, title:{display:true,text:'누계 계약(대)',font:{size:11}}},
+      }
+    },
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
+// 일자별 테이블
+// ═══════════════════════════════════════════════════════════
+function renderTable(recs) {
+  const brs = BRANCHES;
+  const th = s => `<th>${s}</th>`;
+  const td = v => `<td>${v??''}</td>`;
+  const tdc = v => `<td class="c">${v??''}</td>`;
+
+  const head = `<thead>
+    <tr>
+      <th rowspan="2" class="l">날짜</th>
+      <th rowspan="2">기간</th>
+      <th rowspan="2">영업일</th>
+      <th colspan="${brs.length}"><span class="tag-sal">SALES</span> 순계약 (당일)</th>
+      <th colspan="${brs.length}"><span class="tag-sal">SALES</span> 출고 (당일)</th>
+      <th colspan="2"><span class="tag-bps">BPS</span> 배정잔액</th>
+      <th colspan="2"><span class="tag-bps">BPS</span> 당일출고</th>
+    </tr>
+    <tr>
+      ${brs.map(th).join('')}
+      ${brs.map(th).join('')}
+      <th>천안</th><th>안양</th><th>천안</th><th>안양</th>
+    </tr>
+  </thead>`;
+
+  const rows = [...recs].reverse().map(r => {
+    const ps = r.period_start?.slice(5)||'';
+    const pe = r.period_end?.slice(5)||'';
+    const period = ps===pe ? ps : `${ps}~${pe}`;
+    const 순 = brs.map(b => td(r.sales?.[b]?.순계약??'')).join('');
+    const 출 = brs.map(b => td(r.sales?.[b]?.출고??'')).join('');
+    return `<tr>
+      <td class="l">${r.report_date.slice(5)}</td>
+      ${tdc(period)}${tdc(`${r.영업일수}/${r.전체영업일}`)}
+      ${순}${출}
+      ${td(r.bps?.천안?.배정??'')}${td(r.bps?.안양?.배정??'')}
+      ${td(r.bps?.천안?.당일출고??'')}${td(r.bps?.안양?.당일출고??'')}
+    </tr>`;
+  }).join('');
+
+  // 월 합계 row
+  const sumRow = () => {
+    const s = (key, sub) => recs.reduce((acc,r)=>acc+(r.sales?.[key]?.[sub]??0),0);
+    const sp = (k,s) => recs[recs.length-1]?.sales?.[k]?.[s]??'';
+    const bp = (k,s) => recs[recs.length-1]?.bps?.[k]?.[s]??'';
+    const 순합 = brs.map(b => td(s(b,'순계약'))).join('');
+    const 출합 = brs.map(b => td(s(b,'출고'))).join('');
+    return `<tr class="ttl">
+      <td class="l">합계</td>${tdc('')}${tdc('')}
+      ${순합}${출합}
+      <td>-</td><td>-</td>
+      <td>${recs.reduce((a,r)=>a+(r.bps?.천안?.당일출고??0),0)}</td>
+      <td>${recs.reduce((a,r)=>a+(r.bps?.안양?.당일출고??0),0)}</td>
+    </tr>`;
+  };
+
+  document.getElementById('tableWrap').innerHTML =
+    `<table>${head}<tbody>${sumRow()}${rows}</tbody></table>`;
+}
+
+// ═══════════════════════════════════════════════════════════
+// 초기화
+// ═══════════════════════════════════════════════════════════
+async function init() {
+  allDates = await loadIndex();
+  if (!allDates.length) {
+    document.getElementById('main').innerHTML = `
+      <div class="empty">
+        📭 데이터가 없습니다.<br><br>
+        <small style="color:#718096">samchully_daily.py 실행 시 자동으로 데이터가 추가됩니다.</small>
+      </div>`;
+    document.getElementById('hdrUpdated').textContent = '데이터 없음';
+    return;
+  }
+
+  const monthSet = new Set(allDates.map(d => d.slice(0,6)));
+  availMonths = [...monthSet].sort();
+  curYM = availMonths[availMonths.length-1];
+  buildMonthNav();
+
+  curRecords = await loadMonth(curYM);
+  render(curRecords);
+}
+
+init();
+</script>
+</body>
+</html>
