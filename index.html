@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
@@ -7,20 +7,20 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:'Malgun Gothic','Apple SD Gothic Neo',sans-serif;background:#EEF0F4;color:#1A202C;font-size:13px}
+body{font-family:'Malgun Gothic','Apple SD Gothic Neo',sans-serif;background:#EEF0F4;color:#1A202C;font-size:15px}
 
 /* ── Header ── */
 .hdr{background:linear-gradient(135deg,#1B3A5C 0%,#2D6098 100%);color:#fff;padding:10px 20px;display:flex;align-items:center;justify-content:space-between;box-shadow:0 2px 6px rgba(0,0,0,.2)}
-.hdr-logo{font-size:18px;font-weight:800;letter-spacing:-.5px}
-.hdr-sub{font-size:10px;opacity:.7;margin-top:2px}
-.hdr-right{text-align:right;font-size:11px;opacity:.8;line-height:1.7}
+.hdr-logo{font-size:20px;font-weight:800;letter-spacing:-.5px}
+.hdr-sub{font-size:14px;opacity:.7;margin-top:2px}
+.hdr-right{text-align:right;font-size:15px;opacity:.8;line-height:1.7}
 
 /* ── Month Nav ── */
 .mnav{background:#fff;border-bottom:1px solid #D8DDE5;padding:8px 20px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;position:sticky;top:0;z-index:100;box-shadow:0 1px 4px rgba(0,0,0,.06)}
-.mnav-arrow{width:26px;height:26px;border-radius:50%;border:1px solid #CBD5E0;background:#fff;cursor:pointer;font-size:12px;display:flex;align-items:center;justify-content:center}
+.mnav-arrow{width:26px;height:26px;border-radius:50%;border:1px solid #CBD5E0;background:#fff;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center}
 .mnav-arrow:hover{background:#1B3A5C;color:#fff;border-color:#1B3A5C}
-.mnav-label{font-weight:700;font-size:13px;min-width:70px;text-align:center;color:#2D3748}
-.mbtn{padding:4px 11px;border-radius:14px;border:1px solid #CBD5E0;background:#fff;cursor:pointer;font-size:11px;color:#4A5568}
+.mnav-label{font-weight:700;font-size:15px;min-width:70px;text-align:center;color:#2D3748}
+.mbtn{padding:4px 11px;border-radius:14px;border:1px solid #CBD5E0;background:#fff;cursor:pointer;font-size:13px;color:#4A5568}
 .mbtn:hover{border-color:#1B3A5C;color:#1B3A5C}
 .mbtn.on{background:#1B3A5C;color:#fff;border-color:#1B3A5C}
 
@@ -29,12 +29,12 @@ body{font-family:'Malgun Gothic','Apple SD Gothic Neo',sans-serif;background:#EE
 
 /* ── 요약 테이블 ── */
 .summary-wrap{background:#fff;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.08);overflow:hidden;margin-bottom:12px}
-.summary-title{background:#1B3A5C;color:#fff;font-size:12px;font-weight:700;padding:7px 14px;display:flex;align-items:center;gap:8px}
-.sum-table{width:100%;border-collapse:collapse;font-size:12px}
+.summary-title{background:#1B3A5C;color:#fff;font-size:14px;font-weight:700;padding:7px 14px;display:flex;align-items:center;gap:8px}
+.sum-table{width:100%;border-collapse:collapse;font-size:14px}
 .sum-table th{background:#F0F4FA;color:#2D3748;font-weight:700;padding:6px 12px;text-align:center;border-bottom:1px solid #D8DDE5;border-right:1px solid #E2E8F0}
 .sum-table td{padding:6px 12px;text-align:right;border-bottom:1px solid #F0F2F5;border-right:1px solid #E2E8F0}
 .sum-table td.lbl{text-align:left;font-weight:700;background:#FAFBFD;color:#2D3748;padding-left:14px}
-.sum-table td.unit{text-align:center;color:#718096;font-size:10px;background:#FAFBFD}
+.sum-table td.unit{text-align:center;color:#718096;font-size:12px;background:#FAFBFD}
 .sum-table .pct.hi{color:#27AE60;font-weight:700}
 .sum-table .pct.mid{color:#2D6098}
 .sum-table .pct.lo{color:#E53E3E}
@@ -42,29 +42,29 @@ body{font-family:'Malgun Gothic','Apple SD Gothic Neo',sans-serif;background:#EE
 
 /* ── Date bar ── */
 .date-bar{display:flex;align-items:center;gap:10px;margin-bottom:10px;background:#fff;padding:8px 14px;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,.07)}
-.date-bar label{font-size:12px;color:#4A5568;font-weight:600}
-.date-bar select{padding:4px 10px;border:1px solid #CBD5E0;border-radius:5px;font-size:12px;background:#fff;cursor:pointer}
+.date-bar label{font-size:14px;color:#4A5568;font-weight:600}
+.date-bar select{padding:4px 10px;border:1px solid #CBD5E0;border-radius:5px;font-size:14px;background:#fff;cursor:pointer}
 .prog-wrap{display:flex;align-items:center;gap:8px;margin-left:auto}
-.prog-label{font-size:11px;color:#4A5568}
+.prog-label{font-size:13px;color:#4A5568}
 .prog-bar{width:120px;height:8px;background:#E2E8F0;border-radius:4px;overflow:hidden}
 .prog-fill{height:100%;border-radius:4px;background:#27AE60;transition:width .4s}
 
 /* ── Report Table ── */
 .rep-wrap{background:#fff;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.08);overflow-x:auto;margin-bottom:16px}
-.rep-table{width:100%;border-collapse:collapse;font-size:12px;white-space:nowrap}
+.rep-table{width:100%;border-collapse:collapse;font-size:14px;white-space:nowrap}
 .rep-table th,.rep-table td{padding:5px 8px;text-align:right;border:1px solid #D8DDE5}
 .rep-table td.l{text-align:left}
 .rep-table td.c{text-align:center}
 .rep-table td.na{color:#A0AEC0;text-align:center;background:#FAFAFA}
 
 /* Main header */
-.rep-table tr.main-hdr td{background:#1B3A5C;color:#fff;text-align:left;font-weight:700;font-size:13px;padding:8px 12px;border-color:#1B3A5C}
+.rep-table tr.main-hdr td{background:#1B3A5C;color:#fff;text-align:left;font-weight:700;font-size:15px;padding:8px 12px;border-color:#1B3A5C}
 /* Column header */
-.rep-table tr.col-hdr td{background:#E8EDF3;color:#2D3748;font-weight:700;text-align:center;font-size:11px;padding:4px 6px}
+.rep-table tr.col-hdr td{background:#E8EDF3;color:#2D3748;font-weight:700;text-align:center;font-size:13px;padding:4px 6px}
 /* Section label */
-.rep-table tr.sec-sales td{background:#EBF4FF;color:#1B3A5C;font-weight:700;text-align:left;font-size:11px;padding:4px 10px;border-top:2px solid #4472C4}
-.rep-table tr.sec-as td{background:#FFFBEB;color:#92400E;font-weight:700;text-align:left;font-size:11px;padding:4px 10px;border-top:2px solid #E8A838}
-.rep-table tr.sec-bps td{background:#F0FFF4;color:#276749;font-weight:700;text-align:left;font-size:11px;padding:4px 10px;border-top:2px solid #27AE60}
+.rep-table tr.sec-sales td{background:#EBF4FF;color:#1B3A5C;font-weight:700;text-align:left;font-size:13px;padding:4px 10px;border-top:2px solid #4472C4}
+.rep-table tr.sec-as td{background:#FFFBEB;color:#92400E;font-weight:700;text-align:left;font-size:13px;padding:4px 10px;border-top:2px solid #E8A838}
+.rep-table tr.sec-bps td{background:#F0FFF4;color:#276749;font-weight:700;text-align:left;font-size:13px;padding:4px 10px;border-top:2px solid #27AE60}
 /* Total row */
 .rep-table tr.ttl td{background:#F7FAFC;font-weight:700;color:#1A202C}
 /* Hover */
@@ -74,28 +74,28 @@ body{font-family:'Malgun Gothic','Apple SD Gothic Neo',sans-serif;background:#EE
 .rep-table .mid{color:#2D6098}
 .rep-table .lo{color:#E53E3E}
 /* Reogo (재고) row */
-.rep-table tr.reogo-row td{background:#F0FFF4;font-size:12px;text-align:center}
+.rep-table tr.reogo-row td{background:#F0FFF4;font-size:14px;text-align:center}
 
 /* ── Trend Charts ── */
-.trend-hdr{display:flex;align-items:center;gap:8px;margin:20px 0 10px;font-size:14px;font-weight:700;color:#2D3748}
+.trend-hdr{display:flex;align-items:center;gap:8px;margin:20px 0 10px;font-size:16px;font-weight:700;color:#2D3748}
 .trend-hdr span{width:4px;height:18px;background:#1B3A5C;border-radius:2px;display:inline-block}
 .chart-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
 @media(max-width:800px){.chart-grid{grid-template-columns:1fr}}
 .chart-grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:12px}
 @media(max-width:900px){.chart-grid-3{grid-template-columns:1fr 1fr}}
 .cc{background:#fff;border-radius:10px;padding:14px 16px;box-shadow:0 1px 4px rgba(0,0,0,.07)}
-.cc-title{font-size:12px;font-weight:700;color:#2D3748;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between}
+.cc-title{font-size:14px;font-weight:700;color:#2D3748;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between}
 .cw{position:relative;height:220px}
 .cw-lg{position:relative;height:260px}
 
 /* Tab buttons */
 .tab-row{display:flex;gap:3px}
-.tbtn{padding:3px 9px;border-radius:4px;border:1px solid #CBD5E0;background:#fff;cursor:pointer;font-size:10px;color:#4A5568}
+.tbtn{padding:3px 9px;border-radius:4px;border:1px solid #CBD5E0;background:#fff;cursor:pointer;font-size:12px;color:#4A5568}
 .tbtn.on{background:#1B3A5C;color:#fff;border-color:#1B3A5C}
 
 /* ── Loading / Empty ── */
-.loading{text-align:center;padding:60px;color:#718096;font-size:14px}
-.empty{text-align:center;padding:60px;color:#A0AEC0;font-size:13px}
+.loading{text-align:center;padding:60px;color:#718096;font-size:16px}
+.empty{text-align:center;padding:60px;color:#A0AEC0;font-size:15px}
 ::-webkit-scrollbar{width:5px;height:5px}
 ::-webkit-scrollbar-track{background:#EEF0F4}
 ::-webkit-scrollbar-thumb{background:#CBD5E0;border-radius:3px}
@@ -117,6 +117,13 @@ body{font-family:'Malgun Gothic','Apple SD Gothic Neo',sans-serif;background:#EE
   <button class="mnav-arrow" id="btnNext">▶</button>
   <div style="width:1px;height:18px;background:#E2E8F0;margin:0 3px"></div>
   <div id="mnavBtns" style="display:flex;gap:4px;flex-wrap:wrap"></div>
+  <div style="width:1px;height:18px;background:#E2E8F0;margin:0 8px"></div>
+  <span style="font-size:13px;color:#4A5568;font-weight:600">기간:</span>
+  <input type="date" id="filterFrom" style="padding:3px 8px;border:1px solid #CBD5E0;border-radius:5px;font-size:13px;color:#2D3748">
+  <span style="font-size:13px;color:#4A5568">~</span>
+  <input type="date" id="filterTo" style="padding:3px 8px;border:1px solid #CBD5E0;border-radius:5px;font-size:13px;color:#2D3748">
+  <button onclick="applyFilter()" style="padding:4px 12px;background:#1B3A5C;color:#fff;border:none;border-radius:5px;font-size:13px;cursor:pointer">적용</button>
+  <button onclick="clearFilter()" style="padding:4px 10px;background:#fff;color:#4A5568;border:1px solid #CBD5E0;border-radius:5px;font-size:13px;cursor:pointer">전체</button>
 </div>
 
 <div class="main" id="main">
@@ -134,6 +141,7 @@ const BPSC = {천안:'#E8A838',안양:'#4A90D9',합계:'#2D3748'};
 let allDates = [], allData = {}, availMonths = [], curYM = '';
 let curRecords = [], selDate = '', charts = {};
 let salesMetric = 'contract';
+let filterFrom = '', filterTo = '';   // 기간 필터 (YYYY-MM-DD)
 
 async function fetchJSON(url) {
   const r = await fetch(url + '?_=' + Date.now());
@@ -146,9 +154,31 @@ async function loadRecord(d) {
   try { allData[d] = await fetchJSON(`data/${d}.json`); return allData[d]; } catch { return null; }
 }
 async function loadMonth(ym) {
-  const dates = allDates.filter(d => d.startsWith(ym));
+  let dates = allDates.filter(d => d.startsWith(ym));
+  // 기간 필터 적용
+  if (filterFrom) dates = dates.filter(d => d >= filterFrom.replace(/-/g,''));
+  if (filterTo)   dates = dates.filter(d => d <= filterTo.replace(/-/g,''));
   const recs = await Promise.all(dates.map(d => loadRecord(d)));
   return recs.filter(Boolean);
+}
+
+function applyFilter() {
+  filterFrom = document.getElementById('filterFrom').value;
+  filterTo   = document.getElementById('filterTo').value;
+  // 필터 기간에 해당하는 월 계산
+  if (filterFrom || filterTo) {
+    const fromYM = filterFrom ? filterFrom.slice(0,7).replace('-','') : availMonths[0];
+    const toYM   = filterTo   ? filterTo.slice(0,7).replace('-','')   : availMonths[availMonths.length-1];
+    // 가장 최신 월 또는 필터 범위 내 최신 월로 이동
+    const targetYM = availMonths.filter(ym => ym >= fromYM && ym <= toYM).pop() || curYM;
+    switchMonth(targetYM);
+  }
+}
+function clearFilter() {
+  filterFrom = ''; filterTo = '';
+  document.getElementById('filterFrom').value = '';
+  document.getElementById('filterTo').value = '';
+  switchMonth(curYM);
 }
 
 // ─── Month Nav ────────────────────────────────────────────────
@@ -193,9 +223,10 @@ const BASE_OPT = {
 };
 
 // ─── Format helpers ────────────────────────────────────────────
-const _n = v => (v != null && v !== '') ? v : '-';
-const _f = v => (typeof v === 'number') ? v.toFixed(1) : '-';
-const _p = v => (typeof v === 'number' && v !== 0) ? v.toFixed(1)+'%' : (v === 0 ? '0.0%' : '-');
+const _comma = v => typeof v==='number' ? Math.round(v).toLocaleString('ko-KR') : (v ?? '-');
+const _n = v => (v != null && v !== '') ? (typeof v==='number' ? Math.round(v).toLocaleString('ko-KR') : v) : '-';
+const _f = v => (typeof v === 'number') ? Math.round(v).toLocaleString('ko-KR') : '-';
+const _p = v => (typeof v === 'number' && v !== 0) ? Math.round(v)+'%' : (v === 0 ? '0%' : '-');
 const _cls = v => typeof v==='number' ? (v>=100?'hi':v>=80?'mid':'lo') : '';
 
 // ─── Report Table ──────────────────────────────────────────────
@@ -602,8 +633,8 @@ function buildSummary(rec) {
 
   const sv = getSales(), av = getAS(), bv = getBPS();
   const pcls = v => typeof v==='number' ? (v>=100?'pct hi':v>=80?'pct mid':'pct lo') : '';
-  const pstr = v => typeof v==='number' && v!==0 ? v.toFixed(1)+'%' : '-';
-  const nstr = (v, isFloat) => (v != null && v !== 0) ? (isFloat ? parseFloat(v).toFixed(1) : v) : '-';
+  const pstr = v => typeof v==='number' && v!==0 ? Math.round(v)+'%' : '-';
+  const nstr = (v, isFloat) => (v != null && v !== 0) ? Math.round(v).toLocaleString('ko-KR') : '-';
 
   const row = (lbl, d, isFloat) => `
     <tr>
