@@ -222,10 +222,10 @@ function mkChart(id, cfg) {
 }
 const BASE_OPT = {
   responsive:true, maintainAspectRatio:false, animation:{duration:300},
-  plugins:{legend:{position:'bottom',labels:{boxWidth:9,padding:7,font:{size:10}}}},
+  plugins:{legend:{position:'bottom',labels:{boxWidth:10,padding:8,font:{size:12}}}},
   scales:{
-    x:{grid:{display:false},ticks:{font:{size:10},maxTicksLimit:15}},
-    y:{grid:{display:false},ticks:{font:{size:10}}},
+    x:{grid:{display:false},ticks:{font:{size:12},maxTicksLimit:15}},
+    y:{grid:{display:false},ticks:{font:{size:12}}},
   },
 };
 
@@ -278,9 +278,9 @@ function buildRepTable(rec) {
   // Row templates
   const colHdr1 = () => `<tr class="col-hdr">
     <td style="text-align:left;min-width:70px">지점</td>
-    <td style="min-width:38px">당일</td>
-    <td style="min-width:50px">월누계</td>
-    <td style="min-width:50px">계획</td>
+    <td style="min-width:52px">당일 계약</td>
+    <td style="min-width:58px">당월 계약</td>
+    <td style="min-width:58px">당월 계획</td>
     <td style="min-width:54px">진척률</td>
     <td style="min-width:52px">누적실적</td>
     <td style="min-width:60px">누적진척률</td>
@@ -479,7 +479,7 @@ async function loadMonthlySnapshots() {
   return snaps;
 }
 
-// ─── 막대 끝 레이블 플러그인 (실적+달성률 위 / 계획 아래) ────────
+// ─── 막대 끝 레이블 플러그인 (실적+달성률 → 실적막대 상단 / 계획 → 계획막대 우측끝) ────
 const barLabelPlugin = {
   id: 'barLabel',
   afterDatasetsDraw(chart) {
@@ -487,6 +487,7 @@ const barLabelPlugin = {
     const {ctx, chartArea} = chart;
     const planData = chart.data.datasets[0].data;
     const actData  = chart.data.datasets[1].data;
+    const planMeta = chart.getDatasetMeta(0);
     const actMeta  = chart.getDatasetMeta(1);
     actMeta.data.forEach((bar, i) => {
       const val  = actData[i] || 0;
@@ -494,23 +495,26 @@ const barLabelPlugin = {
       if (!val && !plan) return;
       const pct = plan ? Math.round(val / plan * 100) : 0;
       const pctColor = pct >= 100 ? '#27AE60' : pct >= 80 ? '#2D6098' : '#E53E3E';
-      const xPos = Math.min(bar.x, chartArea.right - 5) + 6;
       ctx.save();
-      // 위: 실적 숫자 + 달성률
       ctx.textBaseline = 'middle';
       ctx.textAlign = 'left';
-      ctx.font = 'bold 11px Malgun Gothic, sans-serif';
-      ctx.fillStyle = '#1A202C';
-      const valStr = Math.round(val).toLocaleString('ko-KR');
-      ctx.fillText(valStr, xPos, bar.y - 7);
-      ctx.font = 'bold 11px Malgun Gothic, sans-serif';
-      ctx.fillStyle = pctColor;
-      ctx.fillText(` (${pct}%)`, xPos + ctx.measureText(valStr).width, bar.y - 7);
-      // 아래: 계획 숫자
-      if (plan) {
-        ctx.font = '10px Malgun Gothic, sans-serif';
-        ctx.fillStyle = '#718096';
-        ctx.fillText(`계획 ${Math.round(plan).toLocaleString('ko-KR')}`, xPos, bar.y + 7);
+      // 실적+진척률: 실적 막대 끝 상단
+      if (val) {
+        const xAct = Math.min(bar.x, chartArea.right - 5) + 5;
+        const valStr = Math.round(val).toLocaleString('ko-KR');
+        ctx.font = 'bold 12px Malgun Gothic, sans-serif';
+        ctx.fillStyle = '#1A202C';
+        ctx.fillText(valStr, xAct, bar.y - 8);
+        ctx.fillStyle = pctColor;
+        ctx.fillText(` (${pct}%)`, xAct + ctx.measureText(valStr).width, bar.y - 8);
+      }
+      // 계획: 계획 막대 우측 끝
+      if (plan && planMeta.data[i]) {
+        const planBar = planMeta.data[i];
+        const xPlan = Math.min(planBar.x, chartArea.right - 5) + 5;
+        ctx.font = '11px Malgun Gothic, sans-serif';
+        ctx.fillStyle = '#9B9B9B';
+        ctx.fillText(`계획 ${Math.round(plan).toLocaleString('ko-KR')}`, xPlan, bar.y + 8);
       }
       ctx.restore();
     });
@@ -529,7 +533,7 @@ const lineLabelPlugin = {
         const val = ds.data[i];
         if (val == null) return;
         ctx.save();
-        ctx.font = '10px Malgun Gothic, sans-serif';
+        ctx.font = '11px Malgun Gothic, sans-serif';
         ctx.fillStyle = ds.borderColor;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'bottom';
@@ -557,19 +561,19 @@ function renderSalesMonthly(snaps) {
   });
   mkChart('salesMonthly', {type:'line', data:{labels, datasets},
     options:{...BASE_OPT, spanGaps:true, layout:{padding:{top:18}},
-      scales:{x:{grid:{display:false},ticks:{font:{size:10}}}, y:{grid:{display:false},ticks:{font:{size:10}}, title:{display:true,text:'순계약 누계(대)',font:{size:10}}}}},
+      scales:{x:{grid:{display:false},ticks:{font:{size:12}}}, y:{grid:{display:false},ticks:{font:{size:12}}, title:{display:true,text:'순계약 누계(대)',font:{size:11}}}}},
     plugins:[lineLabelPlugin]});
 }
 
-// SALES: 연간 누적 계획 대비 실적 (가로 막대)
+// SALES: 연간 누적 계획 대비 실적 — 배정+출고 기준 (가로 막대)
 function renderSalesAnnual(latest) {
   const labels = [...BRANCHES, '합계'];
-  const 누적 = labels.map(b => latest.rep?.sales_계약?.[b]?.누적 ?? 0);
+  const 누적 = labels.map(b => latest.rep?.sales_출고?.[b]?.누적출고 ?? 0);
   const 연간계획 = labels.map(b => {
-    const p = latest.plans?.[`계약누적계획_${b}`];
+    const p = latest.plans?.[`출고누적계획_${b}`];
     if (p) return p;
-    const a = latest.rep?.sales_계약?.[b];
-    return (a?.누적 && a?.누적진척률) ? Math.round(a.누적 / a.누적진척률 * 100) : 0;
+    const a = latest.rep?.sales_출고?.[b];
+    return (a?.누적출고 && a?.누적진척률) ? Math.round(a.누적출고 / a.누적진척률 * 100) : 0;
   });
   const colors = labels.map(b => BC[b] || '#2D3748');
   mkChart('salesAnnual', {
@@ -580,7 +584,7 @@ function renderSalesAnnual(latest) {
     ]},
     options:{...BASE_OPT, grouped:false, indexAxis:'y',
       layout:{padding:{right:160, top:4}},
-      scales:{x:{grid:{display:false},ticks:{font:{size:11}}}, y:{grid:{display:false},ticks:{font:{size:12}}}},
+      scales:{x:{grid:{display:false},ticks:{font:{size:12}}}, y:{grid:{display:false},ticks:{font:{size:13}}}},
       plugins:{...BASE_OPT.plugins, legend:{display:false}},
     },
     plugins:[barLabelPlugin],
@@ -602,7 +606,7 @@ function renderAsMonthly(snaps) {
   });
   mkChart('asMonthly', {type:'line', data:{labels, datasets},
     options:{...BASE_OPT, spanGaps:true, layout:{padding:{top:18}},
-      scales:{x:{grid:{display:false},ticks:{font:{size:10}}}, y:{grid:{display:false},ticks:{font:{size:10}}, title:{display:true,text:'월 매출 누계(백만원)',font:{size:10}}}}},
+      scales:{x:{grid:{display:false},ticks:{font:{size:12}}}, y:{grid:{display:false},ticks:{font:{size:12}}, title:{display:true,text:'월 매출 누계(백만원)',font:{size:11}}}}},
     plugins:[lineLabelPlugin]});
 }
 
@@ -623,7 +627,7 @@ function renderAsAnnual(latest) {
     ]},
     options:{...BASE_OPT, grouped:false, indexAxis:'y',
       layout:{padding:{right:170, top:4}},
-      scales:{x:{grid:{display:false},ticks:{font:{size:11}}}, y:{grid:{display:false},ticks:{font:{size:12}}}},
+      scales:{x:{grid:{display:false},ticks:{font:{size:12}}}, y:{grid:{display:false},ticks:{font:{size:13}}}},
       plugins:{...BASE_OPT.plugins, legend:{display:false}},
     },
     plugins:[barLabelPlugin],
@@ -645,7 +649,7 @@ function renderBpsMonthly(snaps) {
   });
   mkChart('bpsMonthly', {type:'line', data:{labels, datasets},
     options:{...BASE_OPT, spanGaps:true, layout:{padding:{top:18}},
-      scales:{x:{grid:{display:false},ticks:{font:{size:10}}}, y:{grid:{display:false},ticks:{font:{size:10}}, title:{display:true,text:'월 출고 누계(대)',font:{size:10}}}}},
+      scales:{x:{grid:{display:false},ticks:{font:{size:12}}}, y:{grid:{display:false},ticks:{font:{size:12}}, title:{display:true,text:'월 출고 누계(대)',font:{size:11}}}}},
     plugins:[lineLabelPlugin]});
 }
 
@@ -668,7 +672,7 @@ function renderBpsAnnual(latest) {
     ]},
     options:{...BASE_OPT, grouped:false, indexAxis:'y',
       layout:{padding:{right:160, top:4}},
-      scales:{x:{grid:{display:false},ticks:{font:{size:11}}}, y:{grid:{display:false},ticks:{font:{size:12}}}},
+      scales:{x:{grid:{display:false},ticks:{font:{size:12}}}, y:{grid:{display:false},ticks:{font:{size:13}}}},
       plugins:{...BASE_OPT.plugins, legend:{display:false}},
     },
     plugins:[barLabelPlugin],
@@ -712,7 +716,7 @@ function render() {
         <div class="cw"><canvas id="salesMonthly"></canvas></div>
       </div>
       <div class="cc">
-        <div class="cc-title">연간 누적 계획 대비 실적 — 판매(순계약)</div>
+        <div class="cc-title">연간 누적 계획 대비 실적 — 배정+출고</div>
         <div class="cw-lg"><canvas id="salesAnnual"></canvas></div>
       </div>
     </div>
