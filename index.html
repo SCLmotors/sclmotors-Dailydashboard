@@ -219,7 +219,7 @@ const BASE_OPT = {
   plugins:{legend:{position:'bottom',labels:{boxWidth:9,padding:7,font:{size:10}}}},
   scales:{
     x:{grid:{display:false},ticks:{font:{size:10},maxTicksLimit:15}},
-    y:{grid:{color:'#F0F2F5'},ticks:{font:{size:10}}},
+    y:{grid:{display:false},ticks:{font:{size:10}}},
   },
 };
 
@@ -280,17 +280,22 @@ function buildRepTable(rec) {
     <td style="min-width:60px">누적진척률</td>
   </tr>`;
 
-  const colHdr2 = () => `<tr class="col-hdr">
-    <td style="text-align:left;min-width:70px">지점</td>
-    <td style="min-width:40px">배정</td>
-    <td style="min-width:38px">출고</td>
-    <td style="min-width:50px">월배정</td>
-    <td style="min-width:50px">월출고</td>
-    <td style="min-width:50px">출고계획</td>
-    <td style="min-width:54px">진척률</td>
-    <td style="min-width:52px">누적배정</td>
-    <td style="min-width:52px">누적출고</td>
-    <td style="min-width:60px">누적진척률</td>
+  const colHdr2 = () => `
+  <tr class="col-hdr">
+    <td rowspan="2" style="text-align:left;min-width:70px">지점</td>
+    <td rowspan="2" style="min-width:38px">인원</td>
+    <td rowspan="2" style="min-width:58px">배정+출고</td>
+    <td rowspan="2" style="min-width:38px">출고</td>
+    <td colspan="2" style="text-align:center;border-bottom:1px solid #D8DDE5">월간 누계</td>
+    <td rowspan="2" style="min-width:50px">출고계획</td>
+    <td rowspan="2" style="min-width:54px">진척률</td>
+    <td rowspan="2" style="min-width:52px">누적배정</td>
+    <td rowspan="2" style="min-width:52px">누적출고</td>
+    <td rowspan="2" style="min-width:60px">누적진척률</td>
+  </tr>
+  <tr class="col-hdr">
+    <td style="min-width:58px">배정+출고</td>
+    <td style="min-width:50px">출고완료</td>
   </tr>`;
 
   const colHdrAS = () => `<tr class="col-hdr">
@@ -323,9 +328,11 @@ function buildRepTable(rec) {
     if (!d) return '';
     const cls = isTtl ? ' class="ttl"' : '';
     const pc = _cls(d.진척률), np = _cls(d.누적진척률);
+    const 배정출고당일 = (d.당일배정||0) + (d.당일출고||0);
     return `<tr${cls}>
       <td class="l">${lbl}</td>
-      <td>${_n(d.배정대기)}</td>
+      <td class="c">${_n(d.배정대기)}</td>
+      <td>${배정출고당일 ? _n(배정출고당일) : '-'}</td>
       <td>${_n(d.당일출고)}</td>
       <td>${_n(d.월배정누계)||'-'}</td>
       <td>${_n(d.월출고누계)}</td>
@@ -373,7 +380,7 @@ function buildRepTable(rec) {
   h += row1('합계', getContract('합계', sc, '계약계획_합계'), true);
 
   // ── SALES 출고 ──
-  h += `<tr class="sec-sales"><td colspan="10">🚗 SALES 신차 &nbsp;·&nbsp; 배정+출고 (단위: 대)&emsp;<small style="font-weight:normal;color:#4A5568">배정=현재배정대기, 출고=당일출고</small></td></tr>`;
+  h += `<tr class="sec-sales"><td colspan="11">🚗 SALES 신차 &nbsp;·&nbsp; 배정+출고 (단위: 대)&emsp;<small style="font-weight:normal;color:#4A5568">인원=배정대기, 배정+출고=당일합계, 출고=당일출고</small></td></tr>`;
   h += colHdr2();
   BRANCHES.forEach(b => { h += row2(b, getDelivery(b, sd, `출고계획_${b}`), false); });
   h += row2('합계', getDelivery('합계', sd, '출고계획_합계'), true);
@@ -394,7 +401,7 @@ function buildRepTable(rec) {
   BPS지점.forEach(b => { h += row1(b, getBpsContract(b, bc_data), b==='합계'); });
 
   // ── BPS 출고 ──
-  h += `<tr class="sec-bps"><td colspan="10">🏷 BPS 인증중고차 &nbsp;·&nbsp; 배정+출고 (단위: 대)</td></tr>`;
+  h += `<tr class="sec-bps"><td colspan="11">🏷 BPS 인증중고차 &nbsp;·&nbsp; 배정+출고 (단위: 대)</td></tr>`;
   h += colHdr2();
   BPS지점.forEach(b => { h += row2(b, getBpsDelivery(b, bd_data), b==='합계'); });
 
@@ -424,7 +431,7 @@ async function loadMonthlySnapshots() {
   return snaps;
 }
 
-// ─── 막대 끝 레이블 플러그인 (실적값 + 달성률) ──────────────────
+// ─── 막대 끝 레이블 플러그인 (실적+달성률 위 / 계획 아래) ────────
 const barLabelPlugin = {
   id: 'barLabel',
   afterDatasetsDraw(chart) {
@@ -436,25 +443,51 @@ const barLabelPlugin = {
     actMeta.data.forEach((bar, i) => {
       const val  = actData[i] || 0;
       const plan = planData[i] || 0;
-      if (!val) return;
+      if (!val && !plan) return;
       const pct = plan ? Math.round(val / plan * 100) : 0;
       const pctColor = pct >= 100 ? '#27AE60' : pct >= 80 ? '#2D6098' : '#E53E3E';
-      const valStr  = Math.round(val).toLocaleString('ko-KR');
-      const pctStr  = `${pct}%`;
+      const xPos = Math.min(bar.x, chartArea.right - 5) + 6;
       ctx.save();
-      ctx.font = 'bold 10px Malgun Gothic, sans-serif';
+      // 위: 실적 숫자 + 달성률
       ctx.textBaseline = 'middle';
       ctx.textAlign = 'left';
-      const xPos = Math.min(bar.x, chartArea.right - 10) + 5;
-      ctx.fillStyle = '#2D3748';
-      ctx.fillText(`${valStr} (`, xPos, bar.y);
-      const w1 = ctx.measureText(`${valStr} (`).width;
+      ctx.font = 'bold 11px Malgun Gothic, sans-serif';
+      ctx.fillStyle = '#1A202C';
+      const valStr = Math.round(val).toLocaleString('ko-KR');
+      ctx.fillText(valStr, xPos, bar.y - 7);
+      ctx.font = 'bold 11px Malgun Gothic, sans-serif';
       ctx.fillStyle = pctColor;
-      ctx.fillText(pctStr, xPos + w1, bar.y);
-      const w2 = ctx.measureText(pctStr).width;
-      ctx.fillStyle = '#2D3748';
-      ctx.fillText(')', xPos + w1 + w2, bar.y);
+      ctx.fillText(` (${pct}%)`, xPos + ctx.measureText(valStr).width, bar.y - 7);
+      // 아래: 계획 숫자
+      if (plan) {
+        ctx.font = '10px Malgun Gothic, sans-serif';
+        ctx.fillStyle = '#718096';
+        ctx.fillText(`계획 ${Math.round(plan).toLocaleString('ko-KR')}`, xPos, bar.y + 7);
+      }
       ctx.restore();
+    });
+  }
+};
+
+// ─── 선 그래프 데이터 레이블 플러그인 ────────────────────────────
+const lineLabelPlugin = {
+  id: 'lineLabel',
+  afterDatasetsDraw(chart) {
+    const {ctx} = chart;
+    chart.data.datasets.forEach((ds, di) => {
+      const meta = chart.getDatasetMeta(di);
+      if (meta.hidden) return;
+      meta.data.forEach((point, i) => {
+        const val = ds.data[i];
+        if (val == null) return;
+        ctx.save();
+        ctx.font = '10px Malgun Gothic, sans-serif';
+        ctx.fillStyle = ds.borderColor;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
+        ctx.fillText(Math.round(val).toLocaleString('ko-KR'), point.x, point.y - 5);
+        ctx.restore();
+      });
     });
   }
 };
@@ -474,8 +507,10 @@ function renderSalesMonthly(snaps) {
     label: '합계', data: snaps.map(r => r.rep?.sales_계약?.합계?.월누계 ?? null),
     borderColor: '#1B3A5C', fill: false, tension: 0.3, pointRadius: 4, borderWidth: 2.5, borderDash: [5,3], spanGaps: true,
   });
-  mkChart('salesMonthly', {type:'line', data:{labels, datasets}, options:{...BASE_OPT, spanGaps:true,
-    scales:{...BASE_OPT.scales, y:{...BASE_OPT.scales.y, title:{display:true, text:'순계약 누계(대)', font:{size:10}}}}}});
+  mkChart('salesMonthly', {type:'line', data:{labels, datasets},
+    options:{...BASE_OPT, spanGaps:true, layout:{padding:{top:18}},
+      scales:{x:{grid:{display:false},ticks:{font:{size:10}}}, y:{grid:{display:false},ticks:{font:{size:10}}, title:{display:true,text:'순계약 누계(대)',font:{size:10}}}}},
+    plugins:[lineLabelPlugin]});
 }
 
 // SALES: 연간 누적 계획 대비 실적 (가로 막대)
@@ -492,13 +527,13 @@ function renderSalesAnnual(latest) {
   mkChart('salesAnnual', {
     type:'bar',
     data:{labels, datasets:[
-      {label:'연간계획', data:연간계획, backgroundColor:'transparent', borderColor:colors, borderWidth:2, borderRadius:3, order:2},
-      {label:'연간실적', data:누적, backgroundColor:colors.map(c=>c+'BB'), borderWidth:0, borderRadius:3, order:1},
+      {label:'연간계획', data:연간계획, backgroundColor:colors.map(c=>c+'28'), borderColor:colors, borderWidth:2, borderRadius:4, order:2},
+      {label:'연간실적', data:누적, backgroundColor:colors.map(c=>c+'CC'), borderWidth:0, borderRadius:4, order:1},
     ]},
-    options:{...BASE_OPT, indexAxis:'y',
-      layout:{padding:{right:130}},
-      scales:{x:{grid:{display:true,color:'#F0F2F5'},ticks:{font:{size:10}}}, y:{grid:{display:false},ticks:{font:{size:11}}}},
-      plugins:{...BASE_OPT.plugins, legend:{display:true,position:'bottom',labels:{boxWidth:9,padding:7,font:{size:10}}}},
+    options:{...BASE_OPT, grouped:false, indexAxis:'y',
+      layout:{padding:{right:160, top:4}},
+      scales:{x:{grid:{display:false},ticks:{font:{size:11}}}, y:{grid:{display:false},ticks:{font:{size:12}}}},
+      plugins:{...BASE_OPT.plugins, legend:{display:false}},
     },
     plugins:[barLabelPlugin],
   });
@@ -517,8 +552,10 @@ function renderAsMonthly(snaps) {
     label: '합계', data: snaps.map(r => r.rep?.as?.합계?.월누계 ?? null),
     borderColor: '#2D3748', fill: false, tension: 0.3, pointRadius: 4, borderWidth: 2.5, borderDash: [5,3], spanGaps: true,
   });
-  mkChart('asMonthly', {type:'line', data:{labels, datasets}, options:{...BASE_OPT, spanGaps:true,
-    scales:{...BASE_OPT.scales, y:{...BASE_OPT.scales.y, title:{display:true, text:'월 매출 누계(백만원)', font:{size:10}}}}}});
+  mkChart('asMonthly', {type:'line', data:{labels, datasets},
+    options:{...BASE_OPT, spanGaps:true, layout:{padding:{top:18}},
+      scales:{x:{grid:{display:false},ticks:{font:{size:10}}}, y:{grid:{display:false},ticks:{font:{size:10}}, title:{display:true,text:'월 매출 누계(백만원)',font:{size:10}}}}},
+    plugins:[lineLabelPlugin]});
 }
 
 // AS: 연간 누적 계획 대비 실적 (가로 막대)
@@ -533,13 +570,13 @@ function renderAsAnnual(latest) {
   mkChart('asAnnual', {
     type:'bar',
     data:{labels, datasets:[
-      {label:'연간계획', data:연간계획, backgroundColor:'transparent', borderColor:colors, borderWidth:2, borderRadius:3, order:2},
-      {label:'연간실적', data:누적, backgroundColor:colors.map(c=>c+'BB'), borderWidth:0, borderRadius:3, order:1},
+      {label:'연간계획', data:연간계획, backgroundColor:colors.map(c=>c+'28'), borderColor:colors, borderWidth:2, borderRadius:4, order:2},
+      {label:'연간실적', data:누적, backgroundColor:colors.map(c=>c+'CC'), borderWidth:0, borderRadius:4, order:1},
     ]},
-    options:{...BASE_OPT, indexAxis:'y',
-      layout:{padding:{right:140}},
-      scales:{x:{grid:{display:true,color:'#F0F2F5'},ticks:{font:{size:10}}}, y:{grid:{display:false},ticks:{font:{size:11}}}},
-      plugins:{...BASE_OPT.plugins, legend:{display:true,position:'bottom',labels:{boxWidth:9,padding:7,font:{size:10}}}},
+    options:{...BASE_OPT, grouped:false, indexAxis:'y',
+      layout:{padding:{right:170, top:4}},
+      scales:{x:{grid:{display:false},ticks:{font:{size:11}}}, y:{grid:{display:false},ticks:{font:{size:12}}}},
+      plugins:{...BASE_OPT.plugins, legend:{display:false}},
     },
     plugins:[barLabelPlugin],
   });
@@ -558,8 +595,10 @@ function renderBpsMonthly(snaps) {
     label: '합계', data: snaps.map(r => r.rep?.bps_출고?.합계?.월출고누계 ?? null),
     borderColor: BPSC.합계, fill: false, tension: 0.3, pointRadius: 4, borderWidth: 2.5, borderDash: [5,3], spanGaps: true,
   });
-  mkChart('bpsMonthly', {type:'line', data:{labels, datasets}, options:{...BASE_OPT, spanGaps:true,
-    scales:{...BASE_OPT.scales, y:{...BASE_OPT.scales.y, title:{display:true, text:'월 출고 누계(대)', font:{size:10}}}}}});
+  mkChart('bpsMonthly', {type:'line', data:{labels, datasets},
+    options:{...BASE_OPT, spanGaps:true, layout:{padding:{top:18}},
+      scales:{x:{grid:{display:false},ticks:{font:{size:10}}}, y:{grid:{display:false},ticks:{font:{size:10}}, title:{display:true,text:'월 출고 누계(대)',font:{size:10}}}}},
+    plugins:[lineLabelPlugin]});
 }
 
 // BPS: 연간 누적 계획 대비 실적 (가로 막대)
@@ -576,13 +615,13 @@ function renderBpsAnnual(latest) {
   mkChart('bpsAnnual', {
     type:'bar',
     data:{labels, datasets:[
-      {label:'연간계획', data:연간계획, backgroundColor:'transparent', borderColor:colors, borderWidth:2, borderRadius:3, order:2},
-      {label:'연간실적', data:누적, backgroundColor:colors.map(c=>c+'BB'), borderWidth:0, borderRadius:3, order:1},
+      {label:'연간계획', data:연간계획, backgroundColor:colors.map(c=>c+'28'), borderColor:colors, borderWidth:2, borderRadius:4, order:2},
+      {label:'연간실적', data:누적, backgroundColor:colors.map(c=>c+'CC'), borderWidth:0, borderRadius:4, order:1},
     ]},
-    options:{...BASE_OPT, indexAxis:'y',
-      layout:{padding:{right:130}},
-      scales:{x:{grid:{display:true,color:'#F0F2F5'},ticks:{font:{size:10}}}, y:{grid:{display:false},ticks:{font:{size:11}}}},
-      plugins:{...BASE_OPT.plugins, legend:{display:true,position:'bottom',labels:{boxWidth:9,padding:7,font:{size:10}}}},
+    options:{...BASE_OPT, grouped:false, indexAxis:'y',
+      layout:{padding:{right:160, top:4}},
+      scales:{x:{grid:{display:false},ticks:{font:{size:11}}}, y:{grid:{display:false},ticks:{font:{size:12}}}},
+      plugins:{...BASE_OPT.plugins, legend:{display:false}},
     },
     plugins:[barLabelPlugin],
   });
