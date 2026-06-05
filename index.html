@@ -75,6 +75,9 @@ body{font-family:'Malgun Gothic','Apple SD Gothic Neo',sans-serif;background:#EE
 .rep-table .lo{color:#E53E3E}
 /* Reogo (재고) row */
 .rep-table tr.reogo-row td{background:#F0FFF4;font-size:14px;text-align:center}
+/* AS 일반/사고 sub-row */
+.rep-table tr.as-sub td{color:#4A5568;font-size:13px;background:#FDFEFF}
+.rep-table tr.as-sub td.l{padding-left:20px;color:#2D3748}
 
 /* ── Trend Charts ── */
 .trend-hdr{display:flex;align-items:center;gap:8px;margin:20px 0 10px;font-size:16px;font-weight:700;color:#2D3748}
@@ -299,13 +302,13 @@ function buildRepTable(rec) {
   </tr>`;
 
   const colHdrAS = () => `<tr class="col-hdr">
-    <td style="text-align:left;min-width:70px">지점</td>
+    <td style="text-align:left;min-width:100px">지점</td>
     <td style="min-width:36px">인원</td>
-    <td style="min-width:52px">당일(백만)</td>
-    <td style="min-width:60px">월누계</td>
-    <td style="min-width:60px">계획</td>
+    <td style="min-width:60px">당일 실적</td>
+    <td style="min-width:70px">월간 누계</td>
+    <td style="min-width:70px">당월 계획</td>
     <td style="min-width:54px">진척률</td>
-    <td style="min-width:60px">누적실적</td>
+    <td style="min-width:70px">누적실적</td>
     <td style="min-width:60px">누적진척률</td>
   </tr>`;
 
@@ -344,9 +347,9 @@ function buildRepTable(rec) {
     </tr>`;
   };
 
-  const rowAS = (lbl, d, isTtl) => {
+  const rowAS = (lbl, d, isTtl, isSub) => {
     if (!d) return '';
-    const cls = isTtl ? ' class="ttl"' : '';
+    const cls = isTtl ? ' class="ttl"' : (isSub ? ' class="as-sub"' : '');
     const pc = _cls(d.진척률), np = _cls(d.누적진척률);
     return `<tr${cls}>
       <td class="l">${lbl}</td>
@@ -363,6 +366,7 @@ function buildRepTable(rec) {
   const sc = rep.sales_계약 || {};
   const sd = rep.sales_출고 || {};
   const sa = rep.as;
+  const sad = rep.as_detail || {};
   const bc_data = rep.bps_계약 || {};
   const bd_data = rep.bps_출고 || {};
   const brd = rep.bps_재고 || {재고합계:bps.재고합계||0,장기재고:bps.장기재고||0,당월매입:bps.당월매입||0};
@@ -388,9 +392,28 @@ function buildRepTable(rec) {
   // ── AS ──
   h += `<tr class="sec-as"><td colspan="8">🔧 A/S 매출 (단위: 백만원)&emsp;<small style="font-weight:normal;color:#92400E">Retail+상품매출+DHC 합산</small></td></tr>`;
   h += colHdrAS();
-  if (sa) {
-    AS지점.forEach(b => { h += rowAS(b, sa[b], false); });
-    h += rowAS('합계', sa['합계'], true);
+  if (sa || Object.keys(sad).length) {
+    const AS_복합 = new Set(['팩토리','천안','동탄','군포']);
+    const AS_순서 = ['청주','팩토리','천안','동탄','안양','세종','군포','안산'];
+    AS_순서.forEach(b => {
+      const detail = sad[b] || {};
+      if (AS_복합.has(b) && (detail['일반'] || detail['사고'])) {
+        if (detail['일반']) {
+          const wb = detail['일반'].wb;
+          h += rowAS(`${b} 일반${wb != null ? ` [WB:${wb}]` : ''}`, detail['일반'], false, true);
+        }
+        if (detail['사고']) {
+          const wb = detail['사고'].wb;
+          h += rowAS(`${b} 사고${wb != null ? ` [WB:${wb}]` : ''}`, detail['사고'], false, true);
+        }
+        h += rowAS(`${b} 소계`, sa?.[b], false, false);
+      } else {
+        const 일반d = detail['일반'];
+        const wb = 일반d?.wb;
+        h += rowAS(`${b}${wb != null ? ` [WB:${wb}]` : ''}`, sa?.[b] || 일반d, false);
+      }
+    });
+    h += rowAS('합계', sa?.합계, true);
   } else {
     h += `<tr><td colspan="8" style="text-align:center;color:#A0AEC0;padding:12px">AS 데이터 없음 — samchully_daily.py 재실행 시 자동 추가됩니다</td></tr>`;
   }
