@@ -87,6 +87,7 @@ body{font-family:'Malgun Gothic','Apple SD Gothic Neo',sans-serif;background:#EE
 .cc-title{font-size:14px;font-weight:700;color:#2D3748;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between}
 .cw{position:relative;height:220px}
 .cw-lg{position:relative;height:260px}
+.cw-xl{position:relative;height:320px}
 
 /* Tab buttons */
 .tab-row{display:flex;gap:3px}
@@ -411,103 +412,180 @@ function buildRepTable(rec) {
   return h;
 }
 
-// ─── Trend Charts ──────────────────────────────────────────────
-function renderSalesContractChart(recs) {
-  const labels = recs.map(r => r.report_date.slice(5));
-  const key = salesMetric === 'contract' ? '순계약' : '출고';
-  const datasets = BRANCHES.map(b => ({
-    label: b,
-    data: recs.map(r => r.sales?.[b]?.[key] ?? null),
-    borderColor: BC[b], backgroundColor: BC[b]+'18',
-    fill: false, tension: 0.3, pointRadius: 3, borderWidth: 2, spanGaps: true,
-  }));
-  datasets.push({
-    label: '합계',
-    data: recs.map(r => r.sales?.합계?.[key] ?? null),
-    borderColor: '#1B3A5C', backgroundColor: 'transparent',
-    fill: false, tension: 0.3, pointRadius: 4, borderWidth: 2.5, borderDash: [5,3], spanGaps: true,
-  });
-  mkChart('salesLine', {type:'line', data:{labels, datasets}, options:{...BASE_OPT, spanGaps:true}});
+// ─── 월별 스냅샷 수집 (각 달의 마지막 보고일 기준) ─────────────
+async function loadMonthlySnapshots() {
+  const snaps = [];
+  for (const ym of availMonths) {
+    const dates = allDates.filter(d => d.startsWith(ym));
+    if (!dates.length) continue;
+    const rec = await loadRecord(dates[dates.length - 1]);
+    if (rec) snaps.push(rec);
+  }
+  return snaps;
 }
 
-function renderSalesProgress(latest) {
-  const labels = BRANCHES;
-  const 누계 = labels.map(b => latest.sales?.[b]?.출고누계 ?? 0);
-  const 계획 = labels.map(b => latest.plans?.[`출고계획_${b}`] ?? 0);
-  const colors = labels.map(b => BC[b]);
-  mkChart('salesProg', {
+// ─── 막대 끝 레이블 플러그인 (실적값 + 달성률) ──────────────────
+const barLabelPlugin = {
+  id: 'barLabel',
+  afterDatasetsDraw(chart) {
+    if (chart.data.datasets.length < 2) return;
+    const {ctx, chartArea} = chart;
+    const planData = chart.data.datasets[0].data;
+    const actData  = chart.data.datasets[1].data;
+    const actMeta  = chart.getDatasetMeta(1);
+    actMeta.data.forEach((bar, i) => {
+      const val  = actData[i] || 0;
+      const plan = planData[i] || 0;
+      if (!val) return;
+      const pct = plan ? Math.round(val / plan * 100) : 0;
+      const pctColor = pct >= 100 ? '#27AE60' : pct >= 80 ? '#2D6098' : '#E53E3E';
+      const valStr  = Math.round(val).toLocaleString('ko-KR');
+      const pctStr  = `${pct}%`;
+      ctx.save();
+      ctx.font = 'bold 10px Malgun Gothic, sans-serif';
+      ctx.textBaseline = 'middle';
+      ctx.textAlign = 'left';
+      const xPos = Math.min(bar.x, chartArea.right - 10) + 5;
+      ctx.fillStyle = '#2D3748';
+      ctx.fillText(`${valStr} (`, xPos, bar.y);
+      const w1 = ctx.measureText(`${valStr} (`).width;
+      ctx.fillStyle = pctColor;
+      ctx.fillText(pctStr, xPos + w1, bar.y);
+      const w2 = ctx.measureText(pctStr).width;
+      ctx.fillStyle = '#2D3748';
+      ctx.fillText(')', xPos + w1 + w2, bar.y);
+      ctx.restore();
+    });
+  }
+};
+
+// ─── Trend Charts ──────────────────────────────────────────────
+
+// SALES: 지점별 월별 순계약 누계 (선 그래프)
+function renderSalesMonthly(snaps) {
+  const labels = snaps.map(r => r.date.slice(2,4) + '.' + r.date.slice(4,6));
+  const datasets = BRANCHES.map(b => ({
+    label: b,
+    data: snaps.map(r => r.rep?.sales_계약?.[b]?.월누계 ?? null),
+    borderColor: BC[b], backgroundColor: BC[b]+'22',
+    fill: false, tension: 0.3, pointRadius: 4, borderWidth: 2, spanGaps: true,
+  }));
+  datasets.push({
+    label: '합계', data: snaps.map(r => r.rep?.sales_계약?.합계?.월누계 ?? null),
+    borderColor: '#1B3A5C', fill: false, tension: 0.3, pointRadius: 4, borderWidth: 2.5, borderDash: [5,3], spanGaps: true,
+  });
+  mkChart('salesMonthly', {type:'line', data:{labels, datasets}, options:{...BASE_OPT, spanGaps:true,
+    scales:{...BASE_OPT.scales, y:{...BASE_OPT.scales.y, title:{display:true, text:'순계약 누계(대)', font:{size:10}}}}}});
+}
+
+// SALES: 연간 누적 계획 대비 실적 (가로 막대)
+function renderSalesAnnual(latest) {
+  const labels = [...BRANCHES, '합계'];
+  const 누적 = labels.map(b => latest.rep?.sales_계약?.[b]?.누적 ?? 0);
+  const 연간계획 = labels.map(b => {
+    const p = latest.plans?.[`계약누적계획_${b}`];
+    if (p) return p;
+    const a = latest.rep?.sales_계약?.[b];
+    return (a?.누적 && a?.누적진척률) ? Math.round(a.누적 / a.누적진척률 * 100) : 0;
+  });
+  const colors = labels.map(b => BC[b] || '#2D3748');
+  mkChart('salesAnnual', {
     type:'bar',
     data:{labels, datasets:[
-      {label:'출고 누계', data:누계, backgroundColor:colors.map(c=>c+'CC'), borderWidth:0, borderRadius:4},
-      {label:'월 계획', data:계획, backgroundColor:'transparent', borderColor:colors, borderWidth:1.5, borderRadius:4},
+      {label:'연간계획', data:연간계획, backgroundColor:'transparent', borderColor:colors, borderWidth:2, borderRadius:3, order:2},
+      {label:'연간실적', data:누적, backgroundColor:colors.map(c=>c+'BB'), borderWidth:0, borderRadius:3, order:1},
     ]},
     options:{...BASE_OPT, indexAxis:'y',
-      scales:{x:{...BASE_OPT.scales.x,grid:{display:true,color:'#F0F2F5'}}, y:{grid:{display:false},ticks:{font:{size:11}}}},
-      plugins:{...BASE_OPT.plugins,
-        tooltip:{callbacks:{afterBody:items=>{const i=items[0].dataIndex;const n=누계[i],c=계획[i];return c?[`달성률: ${Math.round(n/c*100)}%`]:[];}}},
-      },
+      layout:{padding:{right:130}},
+      scales:{x:{grid:{display:true,color:'#F0F2F5'},ticks:{font:{size:10}}}, y:{grid:{display:false},ticks:{font:{size:11}}}},
+      plugins:{...BASE_OPT.plugins, legend:{display:true,position:'bottom',labels:{boxWidth:9,padding:7,font:{size:10}}}},
     },
+    plugins:[barLabelPlugin],
   });
 }
 
-function renderAsChart(recs) {
-  const labels = recs.map(r => r.report_date.slice(5));
-  const 지점들 = ['청주','팩토리','천안','동탄','안양','세종','군포','안산'];
-  const datasets = 지점들.map(b => ({
+// AS: 지점별 월별 매출 누계 (선 그래프)
+function renderAsMonthly(snaps) {
+  const labels = snaps.map(r => r.date.slice(2,4) + '.' + r.date.slice(4,6));
+  const datasets = AS지점.map(b => ({
     label: b,
-    data: recs.map(r => r.rep?.as?.[b]?.월누계 ?? null),
+    data: snaps.map(r => r.rep?.as?.[b]?.월누계 ?? null),
     borderColor: AS_BC[b], backgroundColor: 'transparent',
-    fill: false, tension: 0.3, pointRadius: 2, borderWidth: 1.5, spanGaps: true,
+    fill: false, tension: 0.3, pointRadius: 4, borderWidth: 2, spanGaps: true,
   }));
   datasets.push({
-    label: '합계',
-    data: recs.map(r => r.rep?.as?.합계?.월누계 ?? null),
-    borderColor: '#2D3748', backgroundColor: 'transparent',
-    fill: false, tension: 0.3, pointRadius: 4, borderWidth: 2.5, borderDash: [5,3], spanGaps: true,
+    label: '합계', data: snaps.map(r => r.rep?.as?.합계?.월누계 ?? null),
+    borderColor: '#2D3748', fill: false, tension: 0.3, pointRadius: 4, borderWidth: 2.5, borderDash: [5,3], spanGaps: true,
   });
-  mkChart('asLine', {type:'line', data:{labels, datasets}, options:{...BASE_OPT, spanGaps:true,
-    scales:{...BASE_OPT.scales, y:{...BASE_OPT.scales.y, title:{display:true,text:'월누계(백만원)',font:{size:10}}}}}});
+  mkChart('asMonthly', {type:'line', data:{labels, datasets}, options:{...BASE_OPT, spanGaps:true,
+    scales:{...BASE_OPT.scales, y:{...BASE_OPT.scales.y, title:{display:true, text:'월 매출 누계(백만원)', font:{size:10}}}}}});
 }
 
-function renderBpsBalanceChart(recs) {
-  const labels = recs.map(r => r.report_date.slice(5));
-  mkChart('bpsBalance', {type:'line',
+// AS: 연간 누적 계획 대비 실적 (가로 막대)
+function renderAsAnnual(latest) {
+  const labels = [...AS지점, '합계'];
+  const 누적 = labels.map(b => latest.rep?.as?.[b]?.누적 ?? 0);
+  const 연간계획 = labels.map(b => {
+    const a = latest.rep?.as?.[b];
+    return (a?.누적 && a?.누적진척률) ? Math.round(a.누적 / a.누적진척률 * 100) : 0;
+  });
+  const colors = labels.map(b => AS_BC[b] || '#2D3748');
+  mkChart('asAnnual', {
+    type:'bar',
     data:{labels, datasets:[
-      {label:'천안 배정잔액', data:recs.map(r=>r.bps?.천안?.배정??null), borderColor:BPSC.천안, backgroundColor:BPSC.천안+'18', fill:true, tension:0.3, pointRadius:3, borderWidth:2, spanGaps:true},
-      {label:'안양 배정잔액', data:recs.map(r=>r.bps?.안양?.배정??null), borderColor:BPSC.안양, backgroundColor:BPSC.안양+'18', fill:true, tension:0.3, pointRadius:3, borderWidth:2, spanGaps:true},
+      {label:'연간계획', data:연간계획, backgroundColor:'transparent', borderColor:colors, borderWidth:2, borderRadius:3, order:2},
+      {label:'연간실적', data:누적, backgroundColor:colors.map(c=>c+'BB'), borderWidth:0, borderRadius:3, order:1},
     ]},
-    options:{...BASE_OPT, spanGaps:true},
+    options:{...BASE_OPT, indexAxis:'y',
+      layout:{padding:{right:140}},
+      scales:{x:{grid:{display:true,color:'#F0F2F5'},ticks:{font:{size:10}}}, y:{grid:{display:false},ticks:{font:{size:11}}}},
+      plugins:{...BASE_OPT.plugins, legend:{display:true,position:'bottom',labels:{boxWidth:9,padding:7,font:{size:10}}}},
+    },
+    plugins:[barLabelPlugin],
   });
 }
 
-function renderBpsCumChart(recs) {
-  const labels = recs.map(r => r.report_date.slice(5));
-  const d = (key, sub) => recs.map(r => r.rep?.bps_계약?.[key]?.[sub] ?? r.bps?.[key]?.[sub==='월누계'?'월누계계약':'월누계출고'] ?? null);
-  mkChart('bpsCum', {type:'line',
-    data:{labels, datasets:[
-      {label:'천안 누계계약', data:d('천안','월누계'), borderColor:BPSC.천안, backgroundColor:'transparent', tension:0.3, pointRadius:3, borderWidth:2, spanGaps:true},
-      {label:'안양 누계계약', data:d('안양','월누계'), borderColor:BPSC.안양, backgroundColor:'transparent', tension:0.3, pointRadius:3, borderWidth:2, spanGaps:true},
-      {label:'천안 누계출고', data:recs.map(r=>r.bps?.천안?.월누계출고??null), borderColor:BPSC.천안+'88', backgroundColor:'transparent', tension:0.3, pointRadius:2, borderWidth:1.5, borderDash:[4,2], spanGaps:true},
-      {label:'안양 누계출고', data:recs.map(r=>r.bps?.안양?.월누계출고??null), borderColor:BPSC.안양+'88', backgroundColor:'transparent', tension:0.3, pointRadius:2, borderWidth:1.5, borderDash:[4,2], spanGaps:true},
-    ]},
-    options:{...BASE_OPT, spanGaps:true},
-  });
-}
-
-function renderSalesCumChart(recs) {
-  const labels = recs.map(r => r.report_date.slice(5));
-  const datasets = BRANCHES.map(b => ({
+// BPS: 지점별 월별 출고 누계 (선 그래프)
+function renderBpsMonthly(snaps) {
+  const labels = snaps.map(r => r.date.slice(2,4) + '.' + r.date.slice(4,6));
+  const datasets = ['천안','안양'].map(b => ({
     label: b,
-    data: recs.map(r => r.sales?.[b]?.계약누계 ?? null),
-    borderColor: BC[b], fill: false, tension: 0.3, pointRadius: 2, borderWidth: 1.8, spanGaps: true,
+    data: snaps.map(r => r.rep?.bps_출고?.[b]?.월출고누계 ?? r.bps?.[b]?.월누계출고 ?? null),
+    borderColor: BPSC[b], backgroundColor: BPSC[b]+'22',
+    fill: false, tension: 0.3, pointRadius: 4, borderWidth: 2, spanGaps: true,
   }));
   datasets.push({
-    label: '합계',
-    data: recs.map(r => r.sales?.합계?.계약누계 ?? null),
-    borderColor: '#2D3748', fill: false, tension: 0.3, pointRadius: 3, borderWidth: 2.5, borderDash: [5,2], spanGaps: true,
+    label: '합계', data: snaps.map(r => r.rep?.bps_출고?.합계?.월출고누계 ?? null),
+    borderColor: BPSC.합계, fill: false, tension: 0.3, pointRadius: 4, borderWidth: 2.5, borderDash: [5,3], spanGaps: true,
   });
-  mkChart('salesCum', {type:'line', data:{labels, datasets}, options:{...BASE_OPT, spanGaps:true,
-    scales:{...BASE_OPT.scales, y:{...BASE_OPT.scales.y, title:{display:true,text:'월 계약 누계(대)',font:{size:10}}}}}});
+  mkChart('bpsMonthly', {type:'line', data:{labels, datasets}, options:{...BASE_OPT, spanGaps:true,
+    scales:{...BASE_OPT.scales, y:{...BASE_OPT.scales.y, title:{display:true, text:'월 출고 누계(대)', font:{size:10}}}}}});
+}
+
+// BPS: 연간 누적 계획 대비 실적 (가로 막대)
+function renderBpsAnnual(latest) {
+  const labels = ['천안','안양','합계'];
+  const 누적 = labels.map(b => latest.rep?.bps_출고?.[b]?.누적출고 ?? 0);
+  const 연간계획 = labels.map(b => {
+    const p = latest.plans?.[`BPS출고누적계획_${b}`];
+    if (p) return p;
+    const bps = latest.rep?.bps_출고?.[b];
+    return (bps?.누적출고 && bps?.누적진척률) ? Math.round(bps.누적출고 / bps.누적진척률 * 100) : 0;
+  });
+  const colors = labels.map(b => BPSC[b]);
+  mkChart('bpsAnnual', {
+    type:'bar',
+    data:{labels, datasets:[
+      {label:'연간계획', data:연간계획, backgroundColor:'transparent', borderColor:colors, borderWidth:2, borderRadius:3, order:2},
+      {label:'연간실적', data:누적, backgroundColor:colors.map(c=>c+'BB'), borderWidth:0, borderRadius:3, order:1},
+    ]},
+    options:{...BASE_OPT, indexAxis:'y',
+      layout:{padding:{right:130}},
+      scales:{x:{grid:{display:true,color:'#F0F2F5'},ticks:{font:{size:10}}}, y:{grid:{display:false},ticks:{font:{size:11}}}},
+      plugins:{...BASE_OPT.plugins, legend:{display:true,position:'bottom',labels:{boxWidth:9,padding:7,font:{size:10}}}},
+    },
+    plugins:[barLabelPlugin],
+  });
 }
 
 // ─── Main Render ───────────────────────────────────────────────
@@ -540,44 +618,39 @@ function render() {
       <table class="rep-table" id="repTable"></table>
     </div>
 
-    <div class="trend-hdr"><span></span> 기간별 트렌드 · ${curYM.slice(0,4)}년 ${parseInt(curYM.slice(4))}월</div>
-
+    <div class="trend-hdr"><span></span> SALES 실적 트렌드</div>
     <div class="chart-grid">
       <div class="cc">
-        <div class="cc-title">
-          SALES 당일 실적 추이
-          <div class="tab-row">
-            <button class="tbtn on" id="tCon" onclick="setSalesMetric('contract')">순계약</button>
-            <button class="tbtn" id="tDel" onclick="setSalesMetric('delivery')">출고</button>
-          </div>
-        </div>
-        <div class="cw"><canvas id="salesLine"></canvas></div>
+        <div class="cc-title">지점별 월별 판매대수 실적 (순계약 누계)</div>
+        <div class="cw"><canvas id="salesMonthly"></canvas></div>
       </div>
       <div class="cc">
-        <div class="cc-title">SALES 출고 누계 vs 계획 (최신 기준)</div>
-        <div class="cw"><canvas id="salesProg"></canvas></div>
+        <div class="cc-title">연간 누적 계획 대비 실적 — 판매(순계약)</div>
+        <div class="cw-lg"><canvas id="salesAnnual"></canvas></div>
       </div>
     </div>
 
+    <div class="trend-hdr"><span></span> A/S 실적 트렌드</div>
     <div class="chart-grid">
       <div class="cc">
-        <div class="cc-title">SALES 월 계약 누계</div>
-        <div class="cw"><canvas id="salesCum"></canvas></div>
+        <div class="cc-title">지점별 월별 매출 실적 (백만원)</div>
+        <div class="cw"><canvas id="asMonthly"></canvas></div>
       </div>
       <div class="cc">
-        <div class="cc-title">A/S 월누계 매출 추이 (백만원)</div>
-        <div class="cw"><canvas id="asLine"></canvas></div>
+        <div class="cc-title">연간 누적 계획 대비 실적 — 매출(백만원)</div>
+        <div class="cw-xl"><canvas id="asAnnual"></canvas></div>
       </div>
     </div>
 
+    <div class="trend-hdr"><span></span> BPS 실적 트렌드</div>
     <div class="chart-grid">
       <div class="cc">
-        <div class="cc-title">BPS 배정잔액 추이</div>
-        <div class="cw"><canvas id="bpsBalance"></canvas></div>
+        <div class="cc-title">지점별 월별 판매대수 실적 (출고 누계)</div>
+        <div class="cw"><canvas id="bpsMonthly"></canvas></div>
       </div>
       <div class="cc">
-        <div class="cc-title">BPS 월 누계 계약·출고</div>
-        <div class="cw"><canvas id="bpsCum"></canvas></div>
+        <div class="cc-title">연간 누적 계획 대비 실적 — 판매(출고)</div>
+        <div class="cw"><canvas id="bpsAnnual"></canvas></div>
       </div>
     </div>
   `;
@@ -600,13 +673,16 @@ function render() {
     document.getElementById('repTable').innerHTML = buildRepTable(r);
   };
 
-  // Charts
-  renderSalesContractChart(curRecords);
-  renderSalesProgress(latest);
-  renderSalesCumChart(curRecords);
-  renderAsChart(curRecords);
-  renderBpsBalanceChart(curRecords);
-  renderBpsCumChart(curRecords);
+  // 연간 누적 막대 그래프 (최신 데이터 기준)
+  renderSalesAnnual(latest);
+  renderAsAnnual(latest);
+  renderBpsAnnual(latest);
+  // 월별 선 그래프 (전체 달 스냅샷 비동기 로드)
+  loadMonthlySnapshots().then(snaps => {
+    renderSalesMonthly(snaps);
+    renderAsMonthly(snaps);
+    renderBpsMonthly(snaps);
+  });
 }
 
 // ─── 요약 테이블 (AE13:AL18 □ 요약 양식) ──────────────────────
@@ -673,12 +749,6 @@ function buildSummary(rec) {
     </table>`;
 }
 
-function setSalesMetric(m) {
-  salesMetric = m;
-  document.getElementById('tCon').classList.toggle('on', m==='contract');
-  document.getElementById('tDel').classList.toggle('on', m==='delivery');
-  renderSalesContractChart(curRecords);
-}
 
 // ─── Init ──────────────────────────────────────────────────────
 async function init() {
