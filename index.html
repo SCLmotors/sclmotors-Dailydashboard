@@ -335,7 +335,7 @@ function buildRepTable(rec) {
     if (!d) return '';
     const cls = isTtl ? ' class="ttl"' : '';
     const pc = _cls(d.진척률), np = _cls(d.누적진척률);
-    const 배정출고당일 = (d.당일배정||0) + (d.당일출고||0);
+    const 배정출고당일 = d.당일배정 || 0;  // G열이 이미 배정증가분+출고 합계
     return `<tr${cls}>
       <td class="l">${lbl}</td>
       <td class="c">${_n(d.배정대기)}</td>
@@ -479,7 +479,7 @@ async function loadMonthlySnapshots() {
   return snaps;
 }
 
-// ─── 막대 끝 레이블 플러그인 (실적+달성률 → 실적막대 상단 / 계획 → 계획막대 우측끝) ────
+// ─── 막대 끝 레이블 플러그인 (실적+달성률 → 실적막대 중간 / 계획 → 계획막대 우측끝) ────
 const barLabelPlugin = {
   id: 'barLabel',
   afterDatasetsDraw(chart) {
@@ -494,27 +494,43 @@ const barLabelPlugin = {
       const plan = planData[i] || 0;
       if (!val && !plan) return;
       const pct = plan ? Math.round(val / plan * 100) : 0;
-      const pctColor = pct >= 100 ? '#27AE60' : pct >= 80 ? '#2D6098' : '#E53E3E';
+      const pctColor = pct >= 100 ? '#1E8449' : pct >= 80 ? '#2D6098' : '#C0392B';
       ctx.save();
       ctx.textBaseline = 'middle';
-      ctx.textAlign = 'left';
-      // 실적+진척률: 실적 막대 끝 상단
+      // 실적+진척률: 실적 막대 중간 (내부)
       if (val) {
-        const xAct = Math.min(bar.x, chartArea.right - 5) + 5;
+        const xMid = (bar.base + bar.x) / 2;
+        const barWidth = bar.x - bar.base;
         const valStr = Math.round(val).toLocaleString('ko-KR');
-        ctx.font = 'bold 12px Malgun Gothic, sans-serif';
-        ctx.fillStyle = '#1A202C';
-        ctx.fillText(valStr, xAct, bar.y - 8);
-        ctx.fillStyle = pctColor;
-        ctx.fillText(` (${pct}%)`, xAct + ctx.measureText(valStr).width, bar.y - 8);
+        const pctStr = ` (${pct}%)`;
+        const fullStr = valStr + pctStr;
+        ctx.font = 'bold 14px Malgun Gothic, sans-serif';
+        const textW = ctx.measureText(fullStr).width;
+        if (barWidth > textW + 8) {
+          // 막대 안에 들어갈 충분한 공간이 있으면 내부에 표시
+          ctx.textAlign = 'center';
+          ctx.fillStyle = '#FFFFFF';
+          ctx.fillText(valStr, xMid - ctx.measureText(pctStr).width / 2, bar.y);
+          ctx.fillStyle = pct >= 100 ? '#A9DFBF' : pct >= 80 ? '#AED6F1' : '#F1948A';
+          ctx.fillText(pctStr, xMid + ctx.measureText(valStr).width / 2, bar.y);
+        } else {
+          // 막대가 짧으면 우측 바깥에 표시
+          ctx.textAlign = 'left';
+          const xOut = Math.min(bar.x, chartArea.right - 5) + 6;
+          ctx.fillStyle = '#1A202C';
+          ctx.fillText(valStr, xOut, bar.y);
+          ctx.fillStyle = pctColor;
+          ctx.fillText(pctStr, xOut + ctx.measureText(valStr).width, bar.y);
+        }
       }
-      // 계획: 계획 막대 우측 끝
+      // 계획: 계획 막대 우측 끝 바깥
       if (plan && planMeta.data[i]) {
         const planBar = planMeta.data[i];
-        const xPlan = Math.min(planBar.x, chartArea.right - 5) + 5;
-        ctx.font = '11px Malgun Gothic, sans-serif';
-        ctx.fillStyle = '#9B9B9B';
-        ctx.fillText(`계획 ${Math.round(plan).toLocaleString('ko-KR')}`, xPlan, bar.y + 8);
+        const xPlan = Math.min(planBar.x, chartArea.right - 5) + 8;
+        ctx.textAlign = 'left';
+        ctx.font = '13px Malgun Gothic, sans-serif';
+        ctx.fillStyle = '#888888';
+        ctx.fillText(`계획 ${Math.round(plan).toLocaleString('ko-KR')}`, xPlan, planBar.y);
       }
       ctx.restore();
     });
@@ -546,28 +562,24 @@ const lineLabelPlugin = {
 
 // ─── Trend Charts ──────────────────────────────────────────────
 
-// SALES: 지점별 월별 순계약 누계 (선 그래프)
+// SALES: 지점별 월별 배정+출고 누계 (선 그래프)
 function renderSalesMonthly(snaps) {
   const labels = snaps.map(r => r.date.slice(2,4) + '.' + r.date.slice(4,6));
   const datasets = BRANCHES.map(b => ({
     label: b,
-    data: snaps.map(r => r.rep?.sales_계약?.[b]?.월누계 ?? null),
+    data: snaps.map(r => r.rep?.sales_출고?.[b]?.월배정누계 ?? null),
     borderColor: BC[b], backgroundColor: BC[b]+'22',
     fill: false, tension: 0.3, pointRadius: 4, borderWidth: 2, spanGaps: true,
   }));
-  datasets.push({
-    label: '합계', data: snaps.map(r => r.rep?.sales_계약?.합계?.월누계 ?? null),
-    borderColor: '#1B3A5C', fill: false, tension: 0.3, pointRadius: 4, borderWidth: 2.5, borderDash: [5,3], spanGaps: true,
-  });
   mkChart('salesMonthly', {type:'line', data:{labels, datasets},
     options:{...BASE_OPT, spanGaps:true, layout:{padding:{top:18}},
-      scales:{x:{grid:{display:false},ticks:{font:{size:12}}}, y:{grid:{display:false},ticks:{font:{size:12}}, title:{display:true,text:'순계약 누계(대)',font:{size:11}}}}},
+      scales:{x:{grid:{display:false},ticks:{font:{size:12}}}, y:{grid:{display:false},ticks:{font:{size:12}}, title:{display:true,text:'배정+출고 누계(대)',font:{size:11}}}}},
     plugins:[lineLabelPlugin]});
 }
 
 // SALES: 연간 누적 계획 대비 실적 — 배정+출고 기준 (가로 막대)
 function renderSalesAnnual(latest) {
-  const labels = [...BRANCHES, '합계'];
+  const labels = [...BRANCHES];
   const 누적 = labels.map(b => latest.rep?.sales_출고?.[b]?.누적출고 ?? 0);
   const 연간계획 = labels.map(b => {
     const p = latest.plans?.[`출고누적계획_${b}`];
@@ -600,10 +612,6 @@ function renderAsMonthly(snaps) {
     borderColor: AS_BC[b], backgroundColor: 'transparent',
     fill: false, tension: 0.3, pointRadius: 4, borderWidth: 2, spanGaps: true,
   }));
-  datasets.push({
-    label: '합계', data: snaps.map(r => r.rep?.as?.합계?.월누계 ?? null),
-    borderColor: '#2D3748', fill: false, tension: 0.3, pointRadius: 4, borderWidth: 2.5, borderDash: [5,3], spanGaps: true,
-  });
   mkChart('asMonthly', {type:'line', data:{labels, datasets},
     options:{...BASE_OPT, spanGaps:true, layout:{padding:{top:18}},
       scales:{x:{grid:{display:false},ticks:{font:{size:12}}}, y:{grid:{display:false},ticks:{font:{size:12}}, title:{display:true,text:'월 매출 누계(백만원)',font:{size:11}}}}},
@@ -612,7 +620,7 @@ function renderAsMonthly(snaps) {
 
 // AS: 연간 누적 계획 대비 실적 (가로 막대)
 function renderAsAnnual(latest) {
-  const labels = [...AS지점, '합계'];
+  const labels = [...AS지점];
   const 누적 = labels.map(b => latest.rep?.as?.[b]?.누적 ?? 0);
   const 연간계획 = labels.map(b => {
     const a = latest.rep?.as?.[b];
@@ -643,10 +651,6 @@ function renderBpsMonthly(snaps) {
     borderColor: BPSC[b], backgroundColor: BPSC[b]+'22',
     fill: false, tension: 0.3, pointRadius: 4, borderWidth: 2, spanGaps: true,
   }));
-  datasets.push({
-    label: '합계', data: snaps.map(r => r.rep?.bps_출고?.합계?.월출고누계 ?? null),
-    borderColor: BPSC.합계, fill: false, tension: 0.3, pointRadius: 4, borderWidth: 2.5, borderDash: [5,3], spanGaps: true,
-  });
   mkChart('bpsMonthly', {type:'line', data:{labels, datasets},
     options:{...BASE_OPT, spanGaps:true, layout:{padding:{top:18}},
       scales:{x:{grid:{display:false},ticks:{font:{size:12}}}, y:{grid:{display:false},ticks:{font:{size:12}}, title:{display:true,text:'월 출고 누계(대)',font:{size:11}}}}},
@@ -655,7 +659,7 @@ function renderBpsMonthly(snaps) {
 
 // BPS: 연간 누적 계획 대비 실적 (가로 막대)
 function renderBpsAnnual(latest) {
-  const labels = ['천안','안양','합계'];
+  const labels = ['천안','안양'];
   const 누적 = labels.map(b => latest.rep?.bps_출고?.[b]?.누적출고 ?? 0);
   const 연간계획 = labels.map(b => {
     const p = latest.plans?.[`BPS출고누적계획_${b}`];
