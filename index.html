@@ -479,7 +479,7 @@ async function loadMonthlySnapshots() {
   return snaps;
 }
 
-// ─── 막대 끝 레이블 플러그인 (실적 → 막대 내부 중간 / 계획 → 계획막대 우측끝 아래) ────
+// ─── 막대 레이블 플러그인: 실적막대 중앙에 "실적 / 계획 (진척률)" ────────────────
 const barLabelPlugin = {
   id: 'barLabel',
   afterDatasetsDraw(chart) {
@@ -487,52 +487,45 @@ const barLabelPlugin = {
     const {ctx, chartArea} = chart;
     const planData = chart.data.datasets[0].data;
     const actData  = chart.data.datasets[1].data;
-    const planMeta = chart.getDatasetMeta(0);
     const actMeta  = chart.getDatasetMeta(1);
     actMeta.data.forEach((bar, i) => {
       const val  = actData[i] || 0;
       const plan = planData[i] || 0;
       if (!val && !plan) return;
-      const pct = plan ? Math.round(val / plan * 100) : 0;
+      const pct     = plan ? Math.round(val / plan * 100) : 0;
       const pctColor = pct >= 100 ? '#1E8449' : pct >= 80 ? '#2D6098' : '#C0392B';
-      const bh = bar.height || 16;  // 막대 세로 두께
+      const valStr  = Math.round(val).toLocaleString('ko-KR');
+      const planStr = Math.round(plan).toLocaleString('ko-KR');
+      const pctStr  = ` (${pct}%)`;
+      // "실적 / 계획 (진척률)" — 3개 구간으로 나눠 색 구분
+      const seg1 = valStr + ' / ' + planStr;
+      ctx.font = 'bold 13px Malgun Gothic, sans-serif';
+      const w1 = ctx.measureText(seg1).width;
+      ctx.font = 'bold 13px Malgun Gothic, sans-serif';
+      const w2 = ctx.measureText(pctStr).width;
+      const totalW = w1 + w2;
+      const barWidth = bar.x - bar.base;
       ctx.save();
       ctx.textBaseline = 'middle';
-      // 실적+진척률: 실적 막대 중간 (내부) — 짧으면 막대 끝 바로 위
-      if (val) {
+      if (barWidth > totalW + 10) {
+        // 실적 막대 내부 중앙
         const xMid = (bar.base + bar.x) / 2;
-        const barWidth = bar.x - bar.base;
-        const valStr = Math.round(val).toLocaleString('ko-KR');
-        const pctStr = ` (${pct}%)`;
-        ctx.font = 'bold 14px Malgun Gothic, sans-serif';
-        const textW = ctx.measureText(valStr + pctStr).width;
-        if (barWidth > textW + 8) {
-          // 충분한 공간: 막대 내부 중앙 (흰 글씨)
-          ctx.textAlign = 'center';
-          ctx.fillStyle = '#FFFFFF';
-          ctx.fillText(valStr, xMid - ctx.measureText(pctStr).width / 2, bar.y);
-          ctx.fillStyle = pct >= 100 ? '#A9DFBF' : pct >= 80 ? '#AED6F1' : '#F1948A';
-          ctx.fillText(pctStr, xMid + ctx.measureText(valStr).width / 2, bar.y);
-        } else {
-          // 짧은 막대: 막대 끝 우측, 막대 위 (계획과 겹치지 않도록 위쪽)
-          ctx.textAlign = 'left';
-          const xOut = Math.min(bar.x, chartArea.right - 5) + 6;
-          const yOut = bar.y - bh / 2 - 5;
-          ctx.fillStyle = '#1A202C';
-          ctx.fillText(valStr, xOut, yOut);
-          ctx.fillStyle = pctColor;
-          ctx.fillText(pctStr, xOut + ctx.measureText(valStr).width, yOut);
-        }
-      }
-      // 계획: 계획 막대 우측 끝, 막대 아래 (실적과 겹치지 않도록 아래쪽)
-      if (plan && planMeta.data[i]) {
-        const planBar = planMeta.data[i];
-        const pbh = planBar.height || 16;
-        const xPlan = Math.min(planBar.x, chartArea.right - 5) + 8;
+        const xStart = xMid - totalW / 2;
         ctx.textAlign = 'left';
-        ctx.font = '13px Malgun Gothic, sans-serif';
-        ctx.fillStyle = '#888888';
-        ctx.fillText(`계획 ${Math.round(plan).toLocaleString('ko-KR')}`, xPlan, planBar.y + pbh / 2 + 6);
+        ctx.font = 'bold 13px Malgun Gothic, sans-serif';
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillText(seg1, xStart, bar.y);
+        ctx.fillStyle = pct >= 100 ? '#A9DFBF' : pct >= 80 ? '#AED6F1' : '#F1948A';
+        ctx.fillText(pctStr, xStart + w1, bar.y);
+      } else {
+        // 짧은 막대: 막대 끝부분에 표시
+        const xOut = Math.min(bar.x, chartArea.right - 5) + 6;
+        ctx.textAlign = 'left';
+        ctx.font = 'bold 13px Malgun Gothic, sans-serif';
+        ctx.fillStyle = '#1A202C';
+        ctx.fillText(seg1, xOut, bar.y);
+        ctx.fillStyle = pctColor;
+        ctx.fillText(pctStr, xOut + w1, bar.y);
       }
       ctx.restore();
     });
@@ -718,7 +711,7 @@ function render() {
     <div class="trend-hdr"><span></span> SALES 실적 트렌드</div>
     <div class="chart-grid">
       <div class="cc">
-        <div class="cc-title">지점별 월별 판매대수 실적 (순계약 누계)</div>
+        <div class="cc-title">지점별 월별 판매대수 실적</div>
         <div class="cw"><canvas id="salesMonthly"></canvas></div>
       </div>
       <div class="cc">
