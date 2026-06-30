@@ -27,12 +27,7 @@
 <div id="form">
   <p class="desc">승인자를 선택하고 확인 칸에 <b>"승인"</b>을 입력한 뒤 [승인하기]를 누르세요.</p>
   <label>승인자</label>
-  <select id="who">
-    <option value="">— 선택 —</option>
-    <option>김성택 팀장</option>
-    <option>임혜리 과장</option>
-    <option>윤영준 과장</option>
-  </select>
+  <select id="who"><option value="">— 선택 —</option></select>
   <label>확인 입력 (정확히 "승인")</label>
   <input id="txt" placeholder="승인" autocomplete="off">
   <button class="btn primary" onclick="submitApprove()">승인하기</button>
@@ -52,6 +47,16 @@
   var WH = 'https://webhook.site/' + U;
   if (D) document.getElementById('meta').textContent = '보고 일자: ' + D;
   if (!U) document.getElementById('meta').textContent = '⚠ 잘못된 승인 링크(토큰 없음)';
+
+  // 승인자 목록을 approvers.json(외부화)에서 로드. 실패 시 기본값.
+  (function loadApprovers(){
+    var sel = document.getElementById('who');
+    function fill(list){ list.forEach(function(n){ var o=document.createElement('option'); o.textContent=n; sel.appendChild(o); }); }
+    fetch('./approvers.json?t=' + Date.now(), {cache:'no-store'})
+      .then(function(r){ if(!r.ok) throw 0; return r.json(); })
+      .then(function(list){ fill(list); })
+      .catch(function(){ fill(['김성택 팀장','임혜리 과장','윤영준 과장']); });
+  })();
 
   function pad(n){ return (n < 10 ? '0' : '') + n; }
   function fmt(iso){
