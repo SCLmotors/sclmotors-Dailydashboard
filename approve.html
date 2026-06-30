@@ -73,21 +73,20 @@
   }
 
   function showRecords(){
+    // webhook.site 요청목록 API는 CORS 미지원 → AI가 같은 출처(GitHub Pages)에 올린 approvals.json 사용.
     var rec = document.getElementById('rec');
     rec.innerHTML = '불러오는 중...';
-    fetch('https://webhook.site/token/' + U + '/requests?sorting=newest', {mode:'cors'})
-      .then(function(r){ return r.json(); })
-      .then(function(d){
-        var rows = (d.data || []).filter(function(x){
-          var q = x.query || {}; return q.submit === '1' && q.text === '승인' && q.approver;
-        });
+    fetch('./approvals.json?t=' + Date.now(), {cache:'no-store'})
+      .then(function(r){ if(!r.ok) throw 0; return r.json(); })
+      .then(function(rows){
+        rows = (rows || []).filter(function(x){ return x.approver; }).reverse();
         if (!rows.length){ rec.innerHTML = '<p class="desc">승인 기록이 없습니다.</p>'; return; }
         rec.innerHTML = '<h4>승인 기록 (' + rows.length + '건)</h4>' + rows.map(function(x){
-          var q = x.query;
-          return '<div class="rec-item">' + fmt(x.created_at) + '<br><b>' + q.approver + '</b> 님 승인</div>';
+          return '<div class="rec-item">' + fmt(x.time_utc) +
+                 '<br>일자 ' + (x.date||'') + ' &nbsp; <b>' + x.approver + '</b> 님 승인</div>';
         }).join('');
       })
-      .catch(function(){ rec.innerHTML = '<p class="desc">기록을 불러올 수 없습니다(잠시 후 재시도).</p>'; });
+      .catch(function(){ rec.innerHTML = '<p class="desc">아직 승인 기록이 없습니다(승인 처리 후 갱신됨).</p>'; });
   }
 </script>
 </body>
