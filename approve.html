@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>일일업무보고 승인</title>
+<style>
+  body{font-family:-apple-system,BlinkMacSystemFont,'Malgun Gothic',sans-serif;max-width:440px;margin:28px auto;padding:0 16px;color:#222}
+  h2{margin-bottom:4px}
+  .desc{color:#666;font-size:14px;margin:6px 0 16px}
+  label{font-size:14px;font-weight:bold;display:block;margin-top:6px}
+  select,input{width:100%;padding:10px;font-size:16px;margin:5px 0 12px;box-sizing:border-box;border:1px solid #ccc;border-radius:7px}
+  .btn{width:100%;padding:13px;font-size:17px;border:0;border-radius:9px;font-weight:bold;cursor:pointer}
+  .primary{background:#FEE500}
+  .sec{background:#f1f3f5;margin-top:12px}
+  #done{display:none;text-align:center;padding:24px 0}
+  #done h3{color:#0a8a00}
+  #rec{margin-top:14px;font-size:14px}
+  .rec-item{padding:9px 10px;border-bottom:1px solid #eee;background:#fafafa;border-radius:6px;margin-top:6px}
+  .rec-item b{color:#0a58ca}
+</style>
+</head>
+<body>
+<h2>📋 일일업무보고 승인</h2>
+<div class="desc" id="meta"></div>
+
+<div id="form">
+  <p class="desc">승인자를 선택하고 확인 칸에 <b>"승인"</b>을 입력한 뒤 [승인하기]를 누르세요.</p>
+  <label>승인자</label>
+  <select id="who">
+    <option value="">— 선택 —</option>
+    <option>김성택 팀장</option>
+    <option>임혜리 과장</option>
+    <option>윤영준 과장</option>
+  </select>
+  <label>확인 입력 (정확히 "승인")</label>
+  <input id="txt" placeholder="승인" autocomplete="off">
+  <button class="btn primary" onclick="submitApprove()">승인하기</button>
+</div>
+
+<div id="done">
+  <h3>✅ 승인 완료</h3>
+  <p class="desc">일일업무보고 전송이 진행됩니다.</p>
+</div>
+
+<button class="btn sec" onclick="showRecords()">📜 승인 기록 보기</button>
+<div id="rec"></div>
+
+<script>
+  var U = new URLSearchParams(location.search).get('u');
+  var D = new URLSearchParams(location.search).get('date') || '';
+  var WH = 'https://webhook.site/' + U;
+  if (D) document.getElementById('meta').textContent = '보고 일자: ' + D;
+  if (!U) document.getElementById('meta').textContent = '⚠ 잘못된 승인 링크(토큰 없음)';
+
+  function pad(n){ return (n < 10 ? '0' : '') + n; }
+  function fmt(iso){
+    // webhook created_at 은 UTC. 브라우저 로컬(KST)로 표시.
+    var d = new Date((iso || '').replace(' ', 'T') + 'Z');
+    if (isNaN(d)) return iso;
+    return d.getFullYear() + '년 ' + pad(d.getMonth()+1) + '월 ' + pad(d.getDate()) + '일 ' +
+           pad(d.getHours()) + '시 ' + pad(d.getMinutes()) + '분 ' + pad(d.getSeconds()) + '초';
+  }
+
+  function submitApprove(){
+    var w = document.getElementById('who').value;
+    var t = document.getElementById('txt').value.trim();
+    if (!w){ alert('승인자를 선택하세요'); return; }
+    if (t !== '승인'){ alert('확인 칸에 정확히 "승인" 이라고 입력하세요'); return; }
+    var url = WH + '?submit=1&approver=' + encodeURIComponent(w) + '&text=' + encodeURIComponent(t) + '&date=' + encodeURIComponent(D);
+    function ok(){ document.getElementById('form').style.display='none'; document.getElementById('done').style.display='block'; }
+    fetch(url, {mode:'no-cors'}).then(ok).catch(ok);
+  }
+
+  function showRecords(){
+    var rec = document.getElementById('rec');
+    rec.innerHTML = '불러오는 중...';
+    fetch('https://webhook.site/token/' + U + '/requests?sorting=newest', {mode:'cors'})
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        var rows = (d.data || []).filter(function(x){
+          var q = x.query || {}; return q.submit === '1' && q.text === '승인' && q.approver;
+        });
+        if (!rows.length){ rec.innerHTML = '<p class="desc">승인 기록이 없습니다.</p>'; return; }
+        rec.innerHTML = '<h4>승인 기록 (' + rows.length + '건)</h4>' + rows.map(function(x){
+          var q = x.query;
+          return '<div class="rec-item">' + fmt(x.created_at) + '<br><b>' + q.approver + '</b> 님 승인</div>';
+        }).join('');
+      })
+      .catch(function(){ rec.innerHTML = '<p class="desc">기록을 불러올 수 없습니다(잠시 후 재시도).</p>'; });
+  }
+</script>
+</body>
+</html>
