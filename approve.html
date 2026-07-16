@@ -73,25 +73,45 @@
     if (!w){ alert('승인자를 선택하세요'); return; }
     if (t !== '승인'){ alert('확인 칸에 정확히 "승인" 이라고 입력하세요'); return; }
     var url = WH + '?submit=1&approver=' + encodeURIComponent(w) + '&text=' + encodeURIComponent(t) + '&date=' + encodeURIComponent(D);
+    // 승인하는 순간 브라우저에 기록 저장 → Pages 게시 지연과 무관하게 '승인 기록 보기'에 즉시 표시
+    try{
+      var now = new Date();
+      var utc = now.getUTCFullYear()+'-'+pad(now.getUTCMonth()+1)+'-'+pad(now.getUTCDate())+' '+
+                pad(now.getUTCHours())+':'+pad(now.getUTCMinutes())+':'+pad(now.getUTCSeconds());
+      var loc = JSON.parse(localStorage.getItem('approvals_local')||'[]');
+      loc.push({date:D, approver:w, time_utc:utc, _local:true});
+      localStorage.setItem('approvals_local', JSON.stringify(loc));
+    }catch(e){}
     function ok(){ document.getElementById('form').style.display='none'; document.getElementById('done').style.display='block'; }
     fetch(url, {mode:'no-cors'}).then(ok).catch(ok);
   }
 
   function showRecords(){
-    // webhook.site 요청목록 API는 CORS 미지원 → AI가 같은 출처(GitHub Pages)에 올린 approvals.json 사용.
+    // 즉시기록(localStorage) + 서버기록(GitHub Pages approvals.json)을 합쳐서 표시.
+    // → Pages 게시 지연(~1분) 중에도 방금 승인한 기록이 바로 보인다.
     var rec = document.getElementById('rec');
     rec.innerHTML = '불러오는 중...';
+    var local = [];
+    try{ local = JSON.parse(localStorage.getItem('approvals_local')||'[]'); }catch(e){}
+    function render(all){
+      var rows = (all || []).filter(function(x){ return x && x.approver; });
+      var seen = {}, out = [];
+      rows.forEach(function(x){
+        var k = (x.date||'') + '|' + x.approver + '|' + String(x.time_utc||'').slice(0,15);
+        if (!seen[k]){ seen[k] = 1; out.push(x); }
+      });
+      out.reverse();
+      if (!out.length){ rec.innerHTML = '<p class="desc">아직 승인 기록이 없습니다.</p>'; return; }
+      rec.innerHTML = '<h4>승인 기록 (' + out.length + '건)</h4>' + out.map(function(x){
+        return '<div class="rec-item">' + fmt(x.time_utc) +
+               '<br>일자 ' + (x.date||'') + ' &nbsp; <b>' + x.approver + '</b> 님 승인' +
+               (x._local ? ' <span style="opacity:.55">· 방금</span>' : '') + '</div>';
+      }).join('');
+    }
     fetch('./approvals.json?t=' + Date.now(), {cache:'no-store'})
       .then(function(r){ if(!r.ok) throw 0; return r.json(); })
-      .then(function(rows){
-        rows = (rows || []).filter(function(x){ return x.approver; }).reverse();
-        if (!rows.length){ rec.innerHTML = '<p class="desc">승인 기록이 없습니다.</p>'; return; }
-        rec.innerHTML = '<h4>승인 기록 (' + rows.length + '건)</h4>' + rows.map(function(x){
-          return '<div class="rec-item">' + fmt(x.time_utc) +
-                 '<br>일자 ' + (x.date||'') + ' &nbsp; <b>' + x.approver + '</b> 님 승인</div>';
-        }).join('');
-      })
-      .catch(function(){ rec.innerHTML = '<p class="desc">아직 승인 기록이 없습니다(승인 처리 후 갱신됨).</p>'; });
+      .then(function(server){ render(local.concat(server || [])); })
+      .catch(function(){ render(local); });   // 서버 조회 실패해도 즉시기록은 표시
   }
 </script>
 </body>
